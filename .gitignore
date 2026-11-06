@@ -1,0 +1,18 @@
+node_modules/
+.bundle/
+*.apk
+*.aab
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/release/
+*.keystore
+!debug.keystore
+.idea/
+.kotlin/
+
+# Reference screenshots (contain personal info)
+Images/
