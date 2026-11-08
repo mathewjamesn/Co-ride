@@ -6,7 +6,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SearchProvider } from './src/state';
 import { Consent, Onboarding, Otp, Phone } from './src/screens/Auth';
 import { Home } from './src/screens/Home';
-import { Filter, Results, RouteDetail } from './src/screens/Results';
+import { Drop } from './src/screens/Drop';
+import { Plan } from './src/screens/Plan';
+import { Filter, Matches, Results, RouteDetail } from './src/screens/Results';
 import { Menu, Status } from './src/screens/Misc';
 
 const Stack = createNativeStackNavigator();
@@ -15,7 +17,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SearchProvider>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <StatusBar barStyle="dark-content" backgroundColor="#F3F3F3" />
         <NavigationContainer>
           <Stack.Navigator initialRouteName="Consent" screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Consent" component={Consent} />
@@ -23,6 +25,9 @@ export default function App() {
             <Stack.Screen name="Phone" component={Phone} />
             <Stack.Screen name="Otp" component={Otp} />
             <Stack.Screen name="Home" component={Home} />
+            <Stack.Screen name="Drop" component={Drop} />
+            <Stack.Screen name="Plan" component={Plan} />
+            <Stack.Screen name="Matches" component={Matches} />
             <Stack.Screen name="Results" component={Results} />
             <Stack.Screen name="Route" component={RouteDetail} />
             <Stack.Screen name="Filter" component={Filter} options={{ presentation: 'modal' }} />

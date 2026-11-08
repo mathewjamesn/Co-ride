@@ -40,3 +40,82 @@ export const menuItems: { label: string; icon: string }[] = [
   { label: 'Vehicles', icon: 'car-outline' },
   { label: 'Community', icon: 'account-multiple-outline' },
 ];
+
+export type Place = { name: string; addr: string };
+
+export type QuickKey = 'home' | 'office' | 'airport' | 'fav';
+export type PresetKey = 'mall' | 'it' | 'train' | 'hospital' | 'school' | 'metro';
+
+/** Sample Kochi places for the prototype. */
+export const quickPlaces: Record<Exclude<QuickKey, 'fav'>, Place[]> = {
+  home: [{ name: 'Home', addr: 'Edappally, Kochi, Kerala' }],
+  office: [{ name: 'Office', addr: 'Infopark Campus, Kakkanad, Kochi' }],
+  airport: [
+    { name: 'Cochin International Airport', addr: 'Nedumbassery, Kochi, Kerala' },
+    { name: 'Cochin Airport Domestic Terminal', addr: 'Nedumbassery, Kochi, Kerala' },
+  ],
+};
+
+export const presetPlaces: Record<PresetKey, { label: string; icon: string; items: Place[] }> = {
+  mall: {
+    label: 'Mall',
+    icon: 'shopping-outline',
+    items: [
+      { name: 'Lulu Mall', addr: 'Edappally, Kochi, Kerala' },
+      { name: 'Oberon Mall', addr: 'Edappally, Kochi, Kerala' },
+      { name: 'Centre Square Mall', addr: 'MG Road, Kochi, Kerala' },
+    ],
+  },
+  it: {
+    label: 'IT',
+    icon: 'laptop',
+    items: [
+      { name: 'Infopark Phase 1', addr: 'Kakkanad, Kochi, Kerala' },
+      { name: 'SmartCity Kochi', addr: 'Kakkanad, Kochi, Kerala' },
+      { name: 'Technopark Kochi', addr: 'Kusumagiri, Kochi, Kerala' },
+    ],
+  },
+  train: {
+    label: 'Train',
+    icon: 'train',
+    items: [
+      { name: 'Ernakulam Junction (South)', addr: 'Kochi, Kerala' },
+      { name: 'Ernakulam Town (North)', addr: 'Kochi, Kerala' },
+    ],
+  },
+  hospital: {
+    label: 'Hospital',
+    icon: 'hospital-building',
+    items: [
+      { name: 'Aster Medcity', addr: 'Cheranallur, Kochi, Kerala' },
+      { name: 'Rajagiri Hospital', addr: 'Aluva, Kochi, Kerala' },
+    ],
+  },
+  school: {
+    label: 'School',
+    icon: 'school-outline',
+    items: [
+      { name: 'Choice School', addr: 'Tripunithura, Kochi, Kerala' },
+      { name: 'Bhavans Vidya Mandir', addr: 'Elamakkara, Kochi, Kerala' },
+    ],
+  },
+  metro: {
+    label: 'Metro',
+    icon: 'subway-variant',
+    items: [
+      { name: 'Edappally Metro Station', addr: 'Edappally, Kochi, Kerala' },
+      { name: 'MG Road Metro Station', addr: 'MG Road, Kochi, Kerala' },
+      { name: 'Aluva Metro Station', addr: 'Aluva, Kochi, Kerala' },
+    ],
+  },
+};
+
+/** Typed suggestions for the drop-off search box. */
+export const allPlaces: Place[] = [
+  ...Object.values(quickPlaces).flat(),
+  ...Object.values(presetPlaces).flatMap(p => p.items),
+  { name: 'Fort Kochi', addr: 'Fort Kochi, Kochi, Kerala, India' },
+  { name: 'Marine Drive', addr: 'Ernakulam, Kochi, Kerala' },
+];
+
+export const DEFAULT_FROM = 'Infopark Campus, Kakkanad, Kochi';

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { DEFAULT_FROM } from './data';
 
 export type Search = {
   mode: 'find' | 'offer';
@@ -7,22 +8,36 @@ export type Search = {
   when: string;
   seats: number;
   recurring: boolean;
+  recents: string[];
+  favs: string[];
 };
 
 const defaults: Search = {
   mode: 'find',
-  from: '2947+VR6, Infopark Campus, Kochi, Kakkanad',
-  to: 'Fort Kochi, Kochi, Kerala, India',
+  from: DEFAULT_FROM,
+  to: '',
   when: 'Today, 5:35 PM',
   seats: 1,
   recurring: false,
+  recents: [],
+  favs: [],
 };
 
-const Ctx = createContext<{ s: Search; set: (p: Partial<Search>) => void }>({ s: defaults, set: () => {} });
+const Ctx = createContext<{ s: Search; set: (p: Partial<Search>) => void; toggleFav: (name: string) => void; addRecent: (name: string) => void }>({
+  s: defaults,
+  set: () => {},
+  toggleFav: () => {},
+  addRecent: () => {},
+});
 
 export const SearchProvider = ({ children }: { children: React.ReactNode }) => {
   const [s, setS] = useState(defaults);
-  return <Ctx.Provider value={{ s, set: p => setS(prev => ({ ...prev, ...p })) }}>{children}</Ctx.Provider>;
+  const set = (p: Partial<Search>) => setS(prev => ({ ...prev, ...p }));
+  const toggleFav = (name: string) =>
+    setS(prev => ({ ...prev, favs: prev.favs.includes(name) ? prev.favs.filter(f => f !== name) : [...prev.favs, name] }));
+  const addRecent = (name: string) =>
+    setS(prev => ({ ...prev, recents: [name, ...prev.recents.filter(r => r !== name)].slice(0, 5) }));
+  return <Ctx.Provider value={{ s, set, toggleFav, addRecent }}>{children}</Ctx.Provider>;
 };
 
 export const useSearch = () => useContext(Ctx);
