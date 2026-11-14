@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { DEFAULT_FROM } from './data';
+import type { Pt } from './routes';
 
 export type Search = {
   mode: 'find' | 'offer';
@@ -12,6 +13,10 @@ export type Search = {
   favs: string[];
   /** Ids of people I have sent a request / offer to (shown as Requested in the list). */
   requested: string[];
+  /** Offer mode: chosen route alternative and waypoints, valid for routeFor ("from>to"). */
+  routeAlt: number;
+  via: Pt[];
+  routeFor: string;
 };
 
 const defaults: Search = {
@@ -24,6 +29,9 @@ const defaults: Search = {
   recents: [],
   favs: [],
   requested: [],
+  routeAlt: 0,
+  via: [],
+  routeFor: '',
 };
 
 const Ctx = createContext<{ s: Search; set: (p: Partial<Search>) => void; toggleFav: (name: string) => void; addRecent: (name: string) => void }>({

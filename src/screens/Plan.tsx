@@ -7,6 +7,7 @@ import { colors, radius, makeStyles } from '../theme';
 import { useSearch } from '../state';
 import { useGarage, vehicleName } from '../garage';
 import { useTrip } from '../trip';
+import { ALTS, stats } from '../routes';
 
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -35,7 +36,6 @@ const Stepper = ({ label, value, onUp, onDown }: { label: string; value: string;
 );
 const TIMES = ['5:00 PM', '5:35 PM', '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM'];
 const WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-const KM = 11;
 
 /** Plan the ride: route, time, recurring, seats, wallet / vehicle, then search. */
 export function Plan({ navigation }: any) {
@@ -60,16 +60,22 @@ export function Plan({ navigation }: any) {
   const maxSeats = find ? 4 : active?.seats ?? 1;
   const seats = Math.min(s.seats, maxSeats);
   const to = s.to || 'Choose a drop location';
+  const custom = !find && s.routeFor === `${s.from}>${s.to}`;
+  const alt = custom ? s.routeAlt : 0;
+  const via = custom ? s.via : [];
+  const info = stats(alt, via);
+  const KM = info.km;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
       <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }} keyboardShouldPersistTaps="handled">
         <View>
           <MapMock height={250} />
+          {!find ? <Pressable accessibilityRole="button" accessibilityLabel="Choose route on full screen map" onPress={() => navigation.navigate('RoutePick')} style={StyleSheet.absoluteFill} /> : null}
           <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={[st.back, { top: top + 12 }]}>
             <Icon name="arrow-left" size={22} color={colors.text} />
           </Pressable>
-          <View style={st.eta}><T v="label">35 min · {KM} km</T></View>
+          <View style={st.eta}><T v="label">{info.min} min · {KM} km</T></View>
         </View>
 
         <View style={st.body}>
@@ -86,6 +92,19 @@ export function Plan({ navigation }: any) {
               <Icon name="swap-vertical" size={24} color={colors.text} />
             </Pressable>
           </View>
+
+          {!find ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Choose route and waypoints" onPress={() => navigation.navigate('RoutePick')} style={[st.row, { justifyContent: 'space-between', minHeight: 64 }]}>
+              <View style={[st.inline, { flex: 1 }]}>
+                <Icon name="map-marker-path" size={24} color={colors.text} />
+                <View style={{ flex: 1 }}>
+                  <T v="bodyStrong" numberOfLines={1}>Via {ALTS[alt].name}</T>
+                  <T v="small" color={colors.muted}>{info.min} min · {KM} km · {via.length ? `${via.length} waypoint${via.length > 1 ? 's' : ''}` : 'no waypoints'}</T>
+                </View>
+              </View>
+              <T v="label" color={colors.green}>Choose route</T>
+            </Pressable>
+          ) : null}
 
           <Pressable accessibilityRole="button" accessibilityLabel="Choose date and time" onPress={() => setTimeOpen(true)} style={[st.row, { justifyContent: 'space-between' }]}>
             <View style={st.inline}>

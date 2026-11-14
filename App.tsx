@@ -18,6 +18,7 @@ import { Onboarding, Otp, Phone } from './src/screens/Auth';
 import { Home } from './src/screens/Home';
 import { Drop } from './src/screens/Drop';
 import { Plan } from './src/screens/Plan';
+import { RoutePick } from './src/screens/RoutePick';
 import { Filter, Matches, Results, RouteDetail } from './src/screens/Results';
 import { Menu, Status } from './src/screens/Misc';
 import { Accepted, DriverTrip, RideComplete, RiderTrip } from './src/screens/Trip';
@@ -38,6 +39,7 @@ const Screens = {
   Home: themed(Home),
   Drop: themed(Drop),
   Plan: themed(Plan),
+  RoutePick: themed(RoutePick),
   Matches: themed(Matches),
   Results: themed(Results),
   Route: themed(RouteDetail),
@@ -81,6 +83,7 @@ function Shell() {
           <Stack.Screen name="Home" component={Screens.Home} />
           <Stack.Screen name="Drop" component={Screens.Drop} />
           <Stack.Screen name="Plan" component={Screens.Plan} />
+          <Stack.Screen name="RoutePick" component={Screens.RoutePick} />
           <Stack.Screen name="Matches" component={Screens.Matches} />
           <Stack.Screen name="Results" component={Screens.Results} />
           <Stack.Screen name="Route" component={Screens.Route} />
