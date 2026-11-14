@@ -3,8 +3,10 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, MapMock, T, Toggle } from '../components';
-import { colors, radius } from '../theme';
+import { colors, radius, makeStyles } from '../theme';
 import { useSearch } from '../state';
+import { useGarage, vehicleName } from '../garage';
+import { useTrip } from '../trip';
 
 const DAYS = ['Today', 'Tomorrow'];
 const TIMES = ['5:00 PM', '5:35 PM', '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM'];
@@ -14,6 +16,8 @@ const KM = 11;
 /** Plan the ride: route, time, recurring, seats, wallet / vehicle, then search. */
 export function Plan({ navigation }: any) {
   const { s, set } = useSearch();
+  const { active } = useGarage();
+  const { wallet } = useTrip();
   const { top, bottom } = useSafeAreaInsets();
   const find = s.mode === 'find';
   const [timeOpen, setTimeOpen] = useState(false);
@@ -23,7 +27,8 @@ export function Plan({ navigation }: any) {
   const [days, setDays] = useState<boolean[]>([true, true, true, true, true, false, false]);
 
   const [day, time] = s.when.split(', ');
-  const maxSeats = find ? 4 : 3;
+  const maxSeats = find ? 4 : active?.seats ?? 1;
+  const seats = Math.min(s.seats, maxSeats);
   const to = s.to || 'Choose a drop location';
 
   return (
@@ -32,7 +37,7 @@ export function Plan({ navigation }: any) {
         <View>
           <MapMock height={250} />
           <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={[st.back, { top: top + 12 }]}>
-            <Icon name="arrow-left" size={22} color={colors.ink} />
+            <Icon name="arrow-left" size={22} color={colors.text} />
           </Pressable>
           <View style={st.eta}><T v="label">35 min · {KM} km</T></View>
         </View>
@@ -48,13 +53,13 @@ export function Plan({ navigation }: any) {
               <T v="bodyStrong" style={{ flex: 1, paddingRight: 48 }} numberOfLines={1}>{to}</T>
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Swap pickup and drop" onPress={() => set({ from: s.to, to: s.from })} style={st.swap}>
-              <Icon name="swap-vertical" size={24} color={colors.ink} />
+              <Icon name="swap-vertical" size={24} color={colors.text} />
             </Pressable>
           </View>
 
           <Pressable accessibilityRole="button" accessibilityLabel="Choose date and time" onPress={() => setTimeOpen(true)} style={[st.row, { justifyContent: 'space-between' }]}>
             <View style={st.inline}>
-              <Icon name="calendar-clock" size={24} color={colors.ink} />
+              <Icon name="calendar-clock" size={24} color={colors.text} />
               <T v="bodyStrong">{s.when}</T>
             </View>
             <T v="label" color={colors.green}>Change</T>
@@ -62,7 +67,7 @@ export function Plan({ navigation }: any) {
 
           <View style={[st.row, { justifyContent: 'space-between' }]}>
             <View style={st.inline}>
-              <Icon name="recycle" size={24} color={colors.ink} />
+              <Icon name="recycle" size={24} color={colors.text} />
               <T v="bodyStrong">Make this ride recurring</T>
             </View>
             <Toggle value={s.recurring} onChange={v => set({ recurring: v })} />
@@ -70,18 +75,28 @@ export function Plan({ navigation }: any) {
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={[st.row, { flex: 1, justifyContent: 'space-between', paddingHorizontal: 8 }]}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Fewer seats" onPress={() => set({ seats: Math.max(1, s.seats - 1) })} style={st.step}>
-                <Icon name="minus" size={22} color={colors.ink} />
+              <Pressable accessibilityRole="button" accessibilityLabel="Fewer seats" onPress={() => set({ seats: Math.max(1, seats - 1) })} style={st.step}>
+                <Icon name="minus" size={22} color={colors.text} />
               </Pressable>
-              <T v="label">{s.seats} seat{s.seats > 1 ? 's' : ''}</T>
-              <Pressable accessibilityRole="button" accessibilityLabel="More seats" onPress={() => set({ seats: Math.min(maxSeats, s.seats + 1) })} style={st.step}>
-                <Icon name="plus" size={22} color={colors.ink} />
+              <T v="label">{seats} seat{seats > 1 ? 's' : ''}</T>
+              <Pressable accessibilityRole="button" accessibilityLabel="More seats" onPress={() => set({ seats: Math.min(maxSeats, seats + 1) })} style={st.step}>
+                <Icon name="plus" size={22} color={colors.text} />
               </Pressable>
             </View>
-            <View style={[st.row, { flex: 1 }]}>
-              <Icon name={find ? 'wallet-outline' : 'car-outline'} size={22} color={colors.ink} />
-              <T v="label" numberOfLines={1} style={{ flex: 1 }}>{find ? 'Wallet: 250 pts' : 'Swift · KL 07'}</T>
-            </View>
+            {find ? (
+              <View style={[st.row, { flex: 1 }]}>
+                <Icon name="wallet-outline" size={22} color={colors.text} />
+                <T v="label" numberOfLines={1} style={{ flex: 1 }}>Wallet: {wallet} pts</T>
+              </View>
+            ) : (
+              <Pressable accessibilityRole="button" accessibilityLabel="Change vehicle" onPress={() => navigation.navigate(active ? 'Vehicles' : 'AddVehicle', { pick: true })} style={[st.row, { flex: 1 }]}>
+                <Icon name={active?.kind === 'bike' ? 'motorbike' : 'car-outline'} size={22} color={colors.text} />
+                <View style={{ flex: 1 }}>
+                  <T v="label" numberOfLines={1}>{active ? vehicleName(active) : 'Add a vehicle'}</T>
+                  <T v="small" color={colors.blue}>{active ? 'Change' : 'Required to offer'}</T>
+                </View>
+              </Pressable>
+            )}
           </View>
 
           {!find ? (
@@ -93,11 +108,11 @@ export function Plan({ navigation }: any) {
                 </View>
                 <View style={st.inline}>
                   <Pressable accessibilityRole="button" accessibilityLabel="Lower fare" onPress={() => setRate(Math.max(1, rate - 1))} style={st.step}>
-                    <Icon name="minus" size={20} color={colors.ink} />
+                    <Icon name="minus" size={20} color={colors.text} />
                   </Pressable>
                   <T v="label" style={{ minWidth: 50, textAlign: 'center' }}>{rate} pts</T>
                   <Pressable accessibilityRole="button" accessibilityLabel="Raise fare" onPress={() => setRate(Math.min(12, rate + 1))} style={st.step}>
-                    <Icon name="plus" size={20} color={colors.ink} />
+                    <Icon name="plus" size={20} color={colors.text} />
                   </Pressable>
                 </View>
               </View>
@@ -107,7 +122,7 @@ export function Plan({ navigation }: any) {
                   <View style={{ flexDirection: 'row', gap: 6 }}>
                     {WEEK.map((d, i) => (
                       <Pressable key={i} accessibilityRole="button" accessibilityState={{ selected: days[i] }} onPress={() => setDays(days.map((v, j) => (j === i ? !v : v)))} style={[st.day, days[i] && { backgroundColor: colors.ink }]}>
-                        <T v="label" color={days[i] ? colors.lime : colors.ink}>{d}</T>
+                        <T v="label" color={days[i] ? colors.accent : colors.text}>{d}</T>
                       </Pressable>
                     ))}
                   </View>
@@ -130,7 +145,7 @@ export function Plan({ navigation }: any) {
             </View>
           ) : null}
 
-          <Button title={find ? 'Find a pool' : 'Offer pool'} variant="lime" disabled={!s.to || !s.from} onPress={() => navigation.navigate('Matches')} />
+          <Button title={find ? 'Find a pool' : 'Offer pool'} variant="lime" disabled={!s.to || !s.from || (!find && !active)} onPress={() => navigation.navigate('Matches')} />
         </View>
       </ScrollView>
 
@@ -142,13 +157,13 @@ export function Plan({ navigation }: any) {
             <View style={st.dayTabs}>
               {DAYS.map(d => (
                 <Pressable key={d} accessibilityRole="tab" accessibilityState={{ selected: d === day }} onPress={() => set({ when: `${d}, ${time}` })} style={[st.dayTab, d === day && { backgroundColor: colors.ink }]}>
-                  <T v="label" color={d === day ? colors.lime : colors.ink}>{d}</T>
+                  <T v="label" color={d === day ? colors.accent : colors.text}>{d}</T>
                 </Pressable>
               ))}
             </View>
             <View style={st.timeGrid}>
               {TIMES.map(t => (
-                <Pressable key={t} accessibilityRole="button" accessibilityState={{ selected: t === time }} onPress={() => set({ when: `${day}, ${t}` })} style={[st.time, t === time && { backgroundColor: colors.lime, borderColor: colors.ink }]}>
+                <Pressable key={t} accessibilityRole="button" accessibilityState={{ selected: t === time }} onPress={() => set({ when: `${day}, ${t}` })} style={[st.time, t === time && { backgroundColor: colors.lime, borderColor: colors.text }]}>
                   <T v="label">{t}</T>
                 </Pressable>
               ))}
@@ -161,7 +176,7 @@ export function Plan({ navigation }: any) {
   );
 }
 
-const st = StyleSheet.create({
+const st = makeStyles(() => ({
   back: { position: 'absolute', left: 16, width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', elevation: 3 },
   eta: { position: 'absolute', left: 16, bottom: 14, backgroundColor: colors.white, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, elevation: 3 },
   body: { padding: 16, gap: 12, marginTop: -16, backgroundColor: colors.ground, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl },
@@ -173,11 +188,11 @@ const st = StyleSheet.create({
   step: { width: 38, height: 38, borderRadius: 10, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' },
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 14, gap: 16 },
   optRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  day: { flex: 1, minHeight: 44, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  day: { flex: 1, minHeight: 44, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.text, alignItems: 'center', justifyContent: 'center' },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20 },
   dayTabs: { flexDirection: 'row', backgroundColor: colors.ground, borderRadius: radius.pill, padding: 4, gap: 4, marginVertical: 14 },
   dayTab: { flex: 1, minHeight: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   time: { width: '23%', minHeight: 46, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
-});
+}));

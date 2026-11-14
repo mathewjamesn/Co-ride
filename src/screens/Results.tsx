@@ -3,9 +3,11 @@ import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Button, Header, MapMock, PersonCard, Segmented, T, Toggle } from '../components';
-import { colors, radius } from '../theme';
+import { colors, radius, makeStyles } from '../theme';
 import { Person, rideGivers, rideTakers } from '../data';
 import { useSearch } from '../state';
+import { useKeepAwake } from '../keepAwake';
+import { callNumber } from './Chat';
 
 export type Sort = 'recommended' | 'route' | 'points' | 'active' | 'pickup';
 const sortLabels: [Sort, string][] = [
@@ -29,6 +31,7 @@ function sortList(list: Person[], by: Sort) {
 /** Map summary: "Found N carpool givers on your route" with a See givers button. */
 export function Matches({ navigation }: any) {
   const { s } = useSearch();
+  useKeepAwake();
   const { top, bottom } = useSafeAreaInsets();
   const find = s.mode === 'find';
   const total = (find ? rideGivers : rideTakers).length;
@@ -37,7 +40,7 @@ export function Matches({ navigation }: any) {
     <View style={{ flex: 1, backgroundColor: colors.white }}>
       <View style={[st.matchBar, { paddingTop: top + 8 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => navigation.goBack()} style={st.barBtn}>
-          <Icon name="arrow-left" size={22} color={colors.ink} />
+          <Icon name="arrow-left" size={22} color={colors.text} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <T v="bodyStrong" numberOfLines={1}>{s.from} to {s.to}</T>
@@ -53,7 +56,7 @@ export function Matches({ navigation }: any) {
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={st.found}><T v="bodyStrong">Found {total} {noun} on your route.</T></View>
           <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Results')} style={st.see}>
-            <T v="bodyStrong" color={colors.lime}>{find ? 'See givers' : 'See takers'}</T>
+            <T v="bodyStrong" color={colors.accent}>{find ? 'See givers' : 'See takers'}</T>
             <View style={st.badge}><T v="label">{total}</T></View>
           </Pressable>
         </View>
@@ -91,7 +94,7 @@ export function Results({ navigation, route }: any) {
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
           <View style={st.summary}>
-            <Icon name="map-marker-path" size={22} color={colors.ink} />
+            <Icon name="map-marker-path" size={22} color={colors.text} />
             <T style={{ flex: 1, marginLeft: 8 }} numberOfLines={1}>{s.from} → {s.to}</T>
             <T v="label" color={colors.muted}>11 KM</T>
           </View>
@@ -109,6 +112,8 @@ export function Results({ navigation, route }: any) {
             cta={find ? 'Request' : 'Offer'}
             onCta={() => navigation.navigate('Status', { person: item, find })}
             onPress={() => navigation.navigate('Route', { list: data, index })}
+            onChat={() => navigation.navigate('Chat', { id: item.id, name: item.name, sub: item.org })}
+            onCall={callNumber}
           />
         )}
       />
@@ -126,7 +131,7 @@ export function RouteDetail({ navigation, route }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.white }}>
       <View style={[st.routeHead, { paddingTop: top + 8 }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close" style={st.close} onPress={() => navigation.goBack()}><Icon name="close" size={22} color={colors.white} /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close" style={st.close} onPress={() => navigation.goBack()}><Icon name="close" size={22} color={colors.onInk} /></Pressable>
         <T v="heading">{find ? `${p.name}'s ride route` : 'Matching ride taker'}</T>
       </View>
       <View>
@@ -134,22 +139,22 @@ export function RouteDetail({ navigation, route }: any) {
         <View style={st.legCard}>
           <Icon name="walk" size={20} color={colors.muted} /><T v="label">{p.walkTo}</T>
           <Icon name="chevron-right" size={20} color={colors.muted} />
-          <Icon name={p.vehicle === 'bike' ? 'motorbike' : 'car'} size={20} color={colors.ink} />
+          <Icon name={p.vehicle === 'bike' ? 'motorbike' : 'car'} size={20} color={colors.text} />
           <Icon name="chevron-right" size={20} color={colors.muted} />
           <Icon name="walk" size={20} color={colors.muted} /><T v="label">{p.walkFrom}</T>
         </View>
         <View style={[st.tag, { left: 90, top: 150, borderColor: colors.red }]}><T v="label" color={colors.red}>DROP</T></View>
         <View style={[st.tag, { right: 16, top: 190, borderColor: colors.green }]}><T v="label" color={colors.green}>PICK UP</T></View>
-        <View style={st.km}><T v="label" color={colors.lime}>{p.ride.replace(' km', ' KM')}</T></View>
-        <View style={st.chat}><Icon name="phone-message" size={26} color={colors.lime} /></View>
+        <View style={st.km}><T v="label" color={colors.accent}>{p.ride.replace(' km', ' KM')}</T></View>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Message ${p.name}`} onPress={() => navigation.navigate('Chat', { id: p.id, name: p.name, sub: p.org })} style={st.chat}><Icon name="message-text" size={26} color={colors.accent} /></Pressable>
       </View>
       <ScrollView style={st.detailSheet} contentContainerStyle={{ padding: 14, paddingBottom: bottom + 14 }}>
         <View style={st.pager}>
           <View style={st.pill}><Icon name="map-marker-account" size={18} color={colors.green} /><T v="label">Pickup</T></View>
           <View style={st.count}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Previous match" onPress={() => setI(Math.max(0, i - 1))}><Icon name="chevron-left" size={28} color={colors.ink} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Previous match" onPress={() => setI(Math.max(0, i - 1))}><Icon name="chevron-left" size={28} color={colors.text} /></Pressable>
             <T v="small" style={{ textAlign: 'center', fontWeight: '700' }}>{i + 1} / {list.length}{'\n'}Matches</T>
-            <Pressable accessibilityRole="button" accessibilityLabel="Next match" onPress={() => setI(Math.min(list.length - 1, i + 1))}><Icon name="chevron-right" size={28} color={colors.ink} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Next match" onPress={() => setI(Math.min(list.length - 1, i + 1))}><Icon name="chevron-right" size={28} color={colors.text} /></Pressable>
           </View>
           <View style={st.pill}><Icon name="map-marker" size={18} color={colors.red} /><T v="label">Drop</T></View>
         </View>
@@ -163,7 +168,7 @@ export function RouteDetail({ navigation, route }: any) {
               </View>
               <View style={{ alignItems: 'center' }}>
                 <T v="small" style={{ fontWeight: '700' }}>Route match</T>
-                <T v="display" color={colors.ink}>{p.match}%</T>
+                <T v="display" color={colors.text}>{p.match}%</T>
                 <T v="label" color={colors.blue}>{p.points} pts</T>
               </View>
             </View>
@@ -192,7 +197,7 @@ export function Filter({ navigation, route }: any) {
       {tab === 'sort' ? sortLabels.map(([k, label]) => (
         <Pressable key={k} accessibilityRole="radio" accessibilityState={{ selected: sort === k }} style={st.opt} onPress={() => setSort(k)}>
           <T v={sort === k ? 'heading' : 'bodyStrong'} style={{ flex: 1 }}>{label}</T>
-          <Icon name={sort === k ? 'radiobox-marked' : 'radiobox-blank'} size={30} color={colors.ink} />
+          <Icon name={sort === k ? 'radiobox-marked' : 'radiobox-blank'} size={30} color={colors.text} />
         </Pressable>
       )) : (
         <View style={st.opt}>
@@ -211,14 +216,14 @@ export function Filter({ navigation, route }: any) {
   );
 }
 
-const st = StyleSheet.create({
+const st = makeStyles(() => ({
   matchBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line },
   barBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' },
   sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 16, marginTop: -18, elevation: 8 },
   grab: { width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line, alignSelf: 'center', marginBottom: 14 },
   found: { flex: 1.2, backgroundColor: colors.ground, borderRadius: radius.lg, padding: 14, justifyContent: 'center' },
   see: { flex: 1, minHeight: 64, borderRadius: radius.lg, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
-  badge: { position: 'absolute', top: -8, left: -6, minWidth: 26, height: 26, borderRadius: 13, backgroundColor: colors.lime, borderWidth: 2, borderColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  badge: { position: 'absolute', top: -8, left: -6, minWidth: 26, height: 26, borderRadius: 13, backgroundColor: colors.lime, borderWidth: 2, borderColor: colors.text, alignItems: 'center', justifyContent: 'center' },
   stop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot: { width: 12, height: 12, borderRadius: 6 },
   summary: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.lg, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.line },
@@ -230,8 +235,8 @@ const st = StyleSheet.create({
   chat: { position: 'absolute', right: 14, bottom: 30, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', elevation: 4 },
   detailSheet: { flex: 1, marginTop: -16, backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl },
   pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.lime, borderRadius: radius.xl, padding: 10, marginBottom: 14 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.ink, borderRadius: radius.pill, paddingHorizontal: 12, height: 46 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.text, borderRadius: radius.pill, paddingHorizontal: 12, height: 46 },
   count: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.pill, paddingHorizontal: 8, height: 54 },
   person: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: 14, marginBottom: 14 },
   opt: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, minHeight: 68 },
-});
+}));

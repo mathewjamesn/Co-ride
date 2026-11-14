@@ -32,8 +32,7 @@ export const rideTakers: Person[] = [
 export const menuItems: { label: string; icon: string }[] = [
   { label: 'Profile', icon: 'account-circle-outline' },
   { label: 'Settings', icon: 'cog-outline' },
-  { label: 'Carpools', icon: 'account-group-outline' },
-  { label: 'Taxi trips', icon: 'taxi' },
+  { label: 'My Carpools', icon: 'account-group-outline' },
   { label: 'Payments', icon: 'wallet-outline' },
   { label: 'Referral & Rewards', icon: 'gift-outline' },
   { label: 'Favorites', icon: 'heart-outline' },
@@ -43,17 +42,13 @@ export const menuItems: { label: string; icon: string }[] = [
 
 export type Place = { name: string; addr: string };
 
-export type QuickKey = 'home' | 'office' | 'airport' | 'fav';
+export type QuickKey = 'home' | 'office' | 'recent' | 'fav';
 export type PresetKey = 'mall' | 'it' | 'train' | 'hospital' | 'school' | 'metro';
 
 /** Sample Kochi places for the prototype. */
-export const quickPlaces: Record<Exclude<QuickKey, 'fav'>, Place[]> = {
+export const quickPlaces: Record<'home' | 'office', Place[]> = {
   home: [{ name: 'Home', addr: 'Edappally, Kochi, Kerala' }],
   office: [{ name: 'Office', addr: 'Infopark Campus, Kakkanad, Kochi' }],
-  airport: [
-    { name: 'Cochin International Airport', addr: 'Nedumbassery, Kochi, Kerala' },
-    { name: 'Cochin Airport Domestic Terminal', addr: 'Nedumbassery, Kochi, Kerala' },
-  ],
 };
 
 export const presetPlaces: Record<PresetKey, { label: string; icon: string; items: Place[] }> = {
