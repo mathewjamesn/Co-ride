@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, Header, Segmented, T, Toggle } from '../components';
+import { Avatar, BottomNav, Button, Header, Segmented, T, Toggle } from '../components';
 import { colors, makeStyles, radius } from '../theme';
 import { Pref, useTheme } from '../themeContext';
 import { RideLog, useTrip } from '../trip';
+import { useSearch } from '../state';
 
 /* ------------------------------------------------------------------ */
 /* Settings: appearance + screen-on                                    */
@@ -87,7 +88,7 @@ export function History({ navigation }: any) {
   const data = history.filter(h => tab === 'all' || h.role === tab);
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
-      <Header title="My carpools" onBack={() => navigation.goBack()} />
+      <Header title="Booking" subtitle="Your rides and cancellations" onBack={() => navigation.goBack()} />
       <View style={{ margin: 16, marginBottom: 0 }}>
         <Segmented value={tab} options={[['all', 'All'], ['rider', 'Taken'], ['driver', 'Offered']]} onChange={setTab} />
       </View>
@@ -98,6 +99,7 @@ export function History({ navigation }: any) {
         ListEmptyComponent={<T color={colors.muted} style={{ textAlign: 'center', padding: 32 }}>No rides here yet.</T>}
         renderItem={({ item }) => <RideRow r={item} />}
       />
+      <BottomNav active="Booking" navigation={navigation} />
     </View>
   );
 }
@@ -138,13 +140,12 @@ const TOPUPS = [100, 250, 500, 1000];
 
 export function Wallet({ navigation }: any) {
   const { wallet, history, topUp } = useTrip();
-  const { bottom } = useSafeAreaInsets();
   const [amt, setAmt] = useState(250);
   const [added, setAdded] = useState<number | null>(null);
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
       <Header title="Payments" onBack={() => navigation.goBack()} />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: bottom + 16 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 16 }}>
         <View style={st.balance}>
           <T v="label" color={colors.darkMuted}>POINTS BALANCE</T>
           <T v="hero" color={colors.onInk} style={{ marginTop: 4 }}>{wallet} <T v="heading" color={colors.accent}>pts</T></T>
@@ -175,6 +176,58 @@ export function Wallet({ navigation }: any) {
           ))}
         </View>
       </ScrollView>
+      <BottomNav active="Wallet" navigation={navigation} />
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Profile                                                             */
+/* ------------------------------------------------------------------ */
+
+export function Profile({ navigation }: any) {
+  const { history } = useTrip();
+  const { top } = useSafeAreaInsets();
+  const done = history.filter(h => !h.cancelled);
+  const taken = done.filter(h => h.role === 'rider').length;
+  const offered = done.filter(h => h.role === 'driver').length;
+  const rows: { icon: string; label: string; sub: string; onPress: () => void }[] = [
+    { icon: 'car-outline', label: 'My vehicles', sub: 'Add or change the vehicle you offer rides in', onPress: () => navigation.navigate('Vehicles') },
+    { icon: 'cog-outline', label: 'Settings', sub: 'Theme, screen on, notifications', onPress: () => navigation.navigate('Settings') },
+    { icon: 'wallet-outline', label: 'Payments', sub: 'Points and top-ups', onPress: () => navigation.replace('Wallet') },
+    { icon: 'calendar-check-outline', label: 'Booking', sub: 'Past and cancelled rides', onPress: () => navigation.replace('History') },
+  ];
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.ground }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
+        <View style={[st.profileHead, { paddingTop: top + 24 }]}>
+          <Avatar name="Mathew" size={84} />
+          <T v="title" color={colors.onInk} style={{ marginTop: 12 }}>Mathew</T>
+          <View style={st.verified}>
+            <Icon name="shield-check" size={16} color={colors.green} />
+            <T v="label" color={colors.green}>Phone verified</T>
+          </View>
+        </View>
+        <View style={st.stats}>
+          <View style={st.stat}><T v="title">{taken}</T><T v="small" color={colors.muted}>Rides taken</T></View>
+          <View style={st.stat}><T v="title">{offered}</T><T v="small" color={colors.muted}>Rides offered</T></View>
+          <View style={st.stat}><T v="title">5.0</T><T v="small" color={colors.muted}>Rating</T></View>
+        </View>
+        <View style={[st.group, { marginHorizontal: 16 }]}>
+          {rows.map((r, i) => (
+            <Pressable key={r.label} accessibilityRole="button" onPress={r.onPress} style={[st.row, i > 0 && st.divider]}>
+              <View style={st.icon}><Icon name={r.icon as any} size={24} color={colors.text} /></View>
+              <View style={{ flex: 1 }}>
+                <T v="bodyStrong">{r.label}</T>
+                <T v="small" color={colors.muted}>{r.sub}</T>
+              </View>
+              <Icon name="chevron-right" size={24} color={colors.muted} />
+            </Pressable>
+          ))}
+        </View>
+        <Button title="Log out" icon="logout" variant="outline" style={{ marginHorizontal: 16, marginTop: 16 }} onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] })} />
+      </ScrollView>
+      <BottomNav active="Profile" navigation={navigation} />
     </View>
   );
 }
@@ -191,6 +244,7 @@ const REASONS = {
 export function CancelRide({ navigation, route }: any) {
   const role: 'rider' | 'driver' = route.params.role;
   const { trip, reset, logRide } = useTrip();
+  const { s, set } = useSearch();
   const { bottom } = useSafeAreaInsets();
   const [reason, setReason] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -206,6 +260,7 @@ export function CancelRide({ navigation, route }: any) {
       cancelled: true,
     });
     reset();
+    set({ requested: s.requested.filter(id => id !== route.params.personId) });
     setDone(true);
   };
 
@@ -241,6 +296,10 @@ export function CancelRide({ navigation, route }: any) {
 }
 
 const st = makeStyles(() => ({
+  profileHead: { backgroundColor: colors.ink, alignItems: 'center', paddingBottom: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  verified: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.greenTint, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 5, marginTop: 8 },
+  stats: { flexDirection: 'row', gap: 10, margin: 16 },
+  stat: { flex: 1, alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, paddingVertical: 14 },
   group: { backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, minHeight: 68 },
   divider: { borderTopWidth: 1, borderTopColor: colors.line },

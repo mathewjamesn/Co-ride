@@ -10,6 +10,8 @@ export type Search = {
   recurring: boolean;
   recents: string[];
   favs: string[];
+  /** Ids of people I have sent a request / offer to (shown as Requested in the list). */
+  requested: string[];
 };
 
 const defaults: Search = {
@@ -21,6 +23,7 @@ const defaults: Search = {
   recurring: false,
   recents: [],
   favs: [],
+  requested: [],
 };
 
 const Ctx = createContext<{ s: Search; set: (p: Partial<Search>) => void; toggleFav: (name: string) => void; addRecent: (name: string) => void }>({

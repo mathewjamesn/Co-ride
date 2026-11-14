@@ -148,7 +148,41 @@ export const MapMock = ({ height = 300, label }: { height?: number; label?: stri
   );
 };
 
-export const PersonCard = ({ p, cta, onCta, onPress, onChat, onCall }: { p: Person; cta: string; onCta: () => void; onPress?: () => void; onChat?: () => void; onCall?: () => void }) => (
+export type NavTab = 'Home' | 'Booking' | 'Wallet' | 'Profile';
+const TABS: { key: NavTab; label: string; icon: string; on: string; route: string }[] = [
+  { key: 'Home', label: 'Home', icon: 'home-outline', on: 'home', route: 'Home' },
+  { key: 'Booking', label: 'Booking', icon: 'calendar-check-outline', on: 'calendar-check', route: 'History' },
+  { key: 'Wallet', label: 'Wallet', icon: 'wallet-outline', on: 'wallet', route: 'Wallet' },
+  { key: 'Profile', label: 'Profile', icon: 'account-outline', on: 'account', route: 'Profile' },
+];
+
+/** Bottom menu: Home, Booking, Wallet, Profile. */
+export const BottomNav = ({ active, navigation }: { active: NavTab; navigation: any }) => {
+  const { bottom } = useSafeAreaInsets();
+  const go = (tab: (typeof TABS)[number]) => {
+    if (tab.key === active) return;
+    if (tab.key === 'Home') navigation.navigate('Home');
+    else if (active === 'Home') navigation.navigate(tab.route);
+    else navigation.replace(tab.route);
+  };
+  return (
+    <View style={[s.nav, { paddingBottom: bottom + 6 }]} accessibilityRole="tablist">
+      {TABS.map(tab => {
+        const on = tab.key === active;
+        return (
+          <Pressable key={tab.key} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={tab.label} onPress={() => go(tab)} style={s.navItem}>
+            <View style={[s.navPill, on && { backgroundColor: colors.lime }]}>
+              <Icon name={(on ? tab.on : tab.icon) as any} size={24} color={colors.text} />
+            </View>
+            <Text style={[s.navLabel, { color: on ? colors.text : colors.muted, fontWeight: on ? '800' : '600' }]}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+};
+
+export const PersonCard = ({ p, cta, done, onCta, onPress, onChat, onCall }: { p: Person; cta: string; done?: boolean; onCta: () => void; onPress?: () => void; onChat?: () => void; onCall?: () => void }) => (
   <Pressable onPress={onPress} style={s.card}>
     <View style={{ flexDirection: 'row' }}>
       <View style={{ alignItems: 'center', marginRight: 14 }}>
@@ -202,8 +236,9 @@ export const PersonCard = ({ p, cta, onCta, onPress, onChat, onCall }: { p: Pers
       </View>
       <View style={s.row}>
         <Text style={s.points}>{p.points}<Text style={s.pts}> pts</Text></Text>
-        <Pressable accessibilityRole="button" onPress={onCta} style={s.cta}>
-          <Text style={s.ctaText}>{cta}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={done ? `${cta}. View details` : cta} onPress={onCta} style={[s.cta, done && s.ctaDone]}>
+          {done ? <Icon name="check-circle" size={18} color={colors.green} /> : null}
+          <Text style={[s.ctaText, done && { color: colors.green }]}>{cta}</Text>
         </Pressable>
       </View>
     </View>
@@ -230,6 +265,10 @@ const s = makeStyles(() => ({
   name: { fontSize: 18, fontWeight: '800', color: colors.text },
   org: { fontSize: 14, color: colors.muted, flex: 1 },
   time: { fontSize: 18, fontWeight: '800', color: colors.text },
+  nav: { flexDirection: 'row', backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 6, paddingHorizontal: 8 },
+  navItem: { flex: 1, alignItems: 'center', minHeight: 56, justifyContent: 'center', gap: 2 },
+  navPill: { width: 56, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  navLabel: { fontSize: 12 },
   contact: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   sep: { width: 1, height: 28, backgroundColor: colors.line, marginHorizontal: 8 },
   leg: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 10, marginTop: 12, justifyContent: 'center' },
@@ -238,6 +277,7 @@ const s = makeStyles(() => ({
   points: { fontSize: 24, fontWeight: '800', color: colors.text, marginRight: 12 },
   pts: { fontSize: 13, fontWeight: '600', color: colors.muted },
   cta: { backgroundColor: colors.ink, borderRadius: radius.pill, paddingHorizontal: 22, height: 48, alignItems: 'center', justifyContent: 'center' },
+  ctaDone: { flexDirection: 'row', gap: 6, backgroundColor: colors.greenTint, borderWidth: 1.5, borderColor: colors.green },
   ctaText: { color: colors.accent, fontSize: 16, fontWeight: '800' },
 }));
 

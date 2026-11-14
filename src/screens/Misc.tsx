@@ -76,7 +76,7 @@ export function Status({ navigation, route }: any) {
           <View style={st.referIcon}><Icon name="account-multiple-plus" size={56} color={colors.text} /></View>
           <T color={colors.muted} style={{ marginBottom: 12, textAlign: 'center' }}>Earn 500 points plus 2% commission on every ride</T>
           <Button title="Refer now" variant="lime" style={{ alignSelf: 'stretch' }} onPress={() => Linking.openURL('https://wa.me/?text=Join%20me%20on%20Go-Pool')} />
-          {!cancelled && <Button title="Cancel ride" variant="danger" style={{ alignSelf: 'stretch', marginTop: 12 }} onPress={() => navigation.navigate('CancelRide', { role: find ? 'rider' : 'driver', from: s.from, to: s.to, when: s.when, people: person.name })} />}
+          {!cancelled && <Button title="Cancel ride" variant="danger" style={{ alignSelf: 'stretch', marginTop: 12 }} onPress={() => navigation.navigate('CancelRide', { role: find ? 'rider' : 'driver', from: s.from, to: s.to, when: s.when, people: person.name, personId: person.id })} />}
           {cancelled && <Button title="Back to home" variant="outline" style={{ alignSelf: 'stretch', marginTop: 12 }} onPress={() => navigation.popToTop()} />}
         </View>
       </ScrollView>
@@ -85,7 +85,7 @@ export function Status({ navigation, route }: any) {
 }
 
 /** Side menu */
-const MENU_ROUTES: Record<string, string> = { Settings: 'Settings', 'My Carpools': 'History', Payments: 'Wallet', Vehicles: 'Vehicles' };
+const MENU_ROUTES: Record<string, string> = { Settings: 'Settings', 'My Carpools': 'History', Payments: 'Wallet', Vehicles: 'Vehicles', Profile: 'Profile' };
 
 export function Menu({ navigation }: any) {
   const { top } = useSafeAreaInsets();

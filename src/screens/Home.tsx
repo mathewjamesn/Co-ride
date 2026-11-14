@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Segmented, T } from '../components';
+import { BottomNav, Segmented, T } from '../components';
 import { colors, radius, shadow, makeStyles } from '../theme';
 import { Place, PresetKey, allPlaces, presetPlaces, quickPlaces } from '../data';
 import { useSearch } from '../state';
-import { useTrip } from '../trip';
 
 /** Place list shown when a shortcut (Recent, Favourites, a preset) is expanded. */
 function PlaceMenu({ title, items, empty, icon = 'map-marker', onPick, onClose }: { title: string; items: Place[]; empty: string; icon?: string; onPick: (p: Place) => void; onClose: () => void }) {
@@ -45,10 +44,9 @@ const quickTiles = [
 /** Landing screen: Find a Pool / Offer Pool, "Where would you like to go?", shortcuts. */
 export function Home({ navigation }: any) {
   const { s, set, addRecent } = useSearch();
-  const { wallet } = useTrip();
-  const { top, bottom } = useSafeAreaInsets();
+  const { top } = useSafeAreaInsets();
   const [open, setOpen] = useState<'recent' | 'fav' | PresetKey | null>(null);
-  const [presetsOpen, setPresetsOpen] = useState(true);
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const find = s.mode === 'find';
 
   const pick = (p: Place) => {
@@ -78,7 +76,7 @@ export function Home({ navigation }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
-      <ScrollView contentContainerStyle={{ paddingTop: top + 8, paddingBottom: bottom + 24 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingTop: top + 8, paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
         <View style={st.topRow}>
           <Pressable accessibilityRole="button" accessibilityLabel="Open menu" style={st.iconBtn} onPress={() => navigation.navigate('Menu')}>
             <Icon name="menu" size={26} color={colors.text} />
@@ -91,16 +89,16 @@ export function Home({ navigation }: any) {
 
         <View style={st.hero}>
           <View style={st.heroCircle}>
-            <Icon name="car-side" size={96} color={colors.text} />
+            <Icon name="car-side" size={58} color={colors.text} />
             <View style={st.heroPeople}>
               {['#B45309', '#1F5FBF', '#7C3AED'].map(c => (
                 <View key={c} style={[st.person, { backgroundColor: c }]}>
-                  <Icon name="account" size={20} color={colors.onInk} />
+                  <Icon name="account" size={16} color={colors.onInk} />
                 </View>
               ))}
             </View>
           </View>
-          <T v="display" style={{ marginTop: 14, textAlign: 'center' }}>Share the ride.{'\n'}Split the cost.</T>
+          <T v="title" style={{ marginTop: 8, textAlign: 'center' }}>Share the ride.{'\n'}Split the cost.</T>
         </View>
 
         <View style={{ paddingHorizontal: 16, gap: 14 }}>
@@ -154,20 +152,9 @@ export function Home({ navigation }: any) {
             ) : null}
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('History')} style={st.shortcut}>
-              <View style={st.shortIcon}><Icon name="history" size={24} color={colors.text} /></View>
-              <T v="label">My Carpools</T>
-              <T v="small" color={colors.muted}>Rides, cancellations</T>
-            </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Wallet')} style={st.shortcut}>
-              <View style={st.shortIcon}><Icon name="wallet-outline" size={24} color={colors.text} /></View>
-              <T v="label">Payments</T>
-              <T v="small" color={colors.muted}>{wallet} pts</T>
-            </Pressable>
-          </View>
         </View>
       </ScrollView>
+      <BottomNav active="Home" navigation={navigation} />
     </View>
   );
 }
@@ -175,10 +162,10 @@ export function Home({ navigation }: any) {
 const st = makeStyles(() => ({
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
   iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
-  hero: { alignItems: 'center', paddingVertical: 18 },
-  heroCircle: { width: 190, height: 190, borderRadius: 95, backgroundColor: colors.lime, alignItems: 'center', justifyContent: 'center' },
-  heroPeople: { flexDirection: 'row', marginTop: 6 },
-  person: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.lime, marginHorizontal: -3 },
+  hero: { alignItems: 'center', paddingVertical: 6 },
+  heroCircle: { width: 118, height: 118, borderRadius: 59, backgroundColor: colors.lime, alignItems: 'center', justifyContent: 'center' },
+  heroPeople: { flexDirection: 'row', marginTop: 2 },
+  person: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.lime, marginHorizontal: -3 },
   search: { minHeight: 68, borderRadius: radius.xl, backgroundColor: colors.white, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, ...shadow },
   card: { backgroundColor: colors.white, borderRadius: radius.xl, padding: 10, borderWidth: 1, borderColor: colors.line },
   cardHead: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },

@@ -145,7 +145,7 @@ export function Plan({ navigation }: any) {
             </View>
           ) : null}
 
-          <Button title={find ? 'Find a pool' : 'Offer pool'} variant="lime" disabled={!s.to || !s.from || (!find && !active)} onPress={() => navigation.navigate('Matches')} />
+          <Button title={find ? 'Find a pool' : 'Offer pool'} variant="lime" disabled={!s.to || !s.from || (!find && !active)} onPress={() => { set({ requested: [] }); navigation.navigate('Matches'); }} />
         </View>
       </ScrollView>
 

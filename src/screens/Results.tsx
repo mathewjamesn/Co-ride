@@ -71,7 +71,7 @@ export function Matches({ navigation }: any) {
 
 /** List of ride givers (Find) or ride takers (Offer) with filter */
 export function Results({ navigation, route }: any) {
-  const { s } = useSearch();
+  const { s, set } = useSearch();
   const find = s.mode === 'find';
   const [sort, setSort] = useState<Sort>(route.params?.sort ?? 'recommended');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
@@ -109,8 +109,9 @@ export function Results({ navigation, route }: any) {
         renderItem={({ item, index }) => (
           <PersonCard
             p={item}
-            cta={find ? 'Request' : 'Offer'}
-            onCta={() => navigation.navigate('Status', { person: item, find })}
+            cta={s.requested.includes(item.id) ? (find ? 'Requested · View' : 'Offered · View') : find ? 'Request' : 'Offer'}
+            done={s.requested.includes(item.id)}
+            onCta={() => (s.requested.includes(item.id) ? navigation.navigate('Status', { person: item, find }) : set({ requested: [...s.requested, item.id] }))}
             onPress={() => navigation.navigate('Route', { list: data, index })}
             onChat={() => navigation.navigate('Chat', { id: item.id, name: item.name, sub: item.org })}
             onCall={callNumber}
@@ -126,7 +127,9 @@ export function RouteDetail({ navigation, route }: any) {
   const { list, index: start }: { list: Person[]; index: number } = route.params;
   const [i, setI] = useState(start);
   const p = list[i];
-  const find = useSearch().s.mode === 'find';
+  const { s, set } = useSearch();
+  const find = s.mode === 'find';
+  const sent = s.requested.includes(list[i].id);
   const { top, bottom } = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: colors.white }}>
@@ -175,7 +178,12 @@ export function RouteDetail({ navigation, route }: any) {
             <T v="small" style={{ marginTop: 4 }}>★ {p.rating} ({p.reviews})  ·  {p.time}</T>
           </View>
         </View>
-        <Button title={find ? 'Join' : 'Offer ride'} variant="lime" onPress={() => navigation.navigate('Status', { person: p, find })} />
+        <Button
+          title={sent ? (find ? 'Request sent · View' : 'Offer sent · View') : find ? 'Request to join' : 'Offer ride'}
+          icon={sent ? 'check-circle' : undefined}
+          variant={sent ? 'outline' : 'lime'}
+          onPress={() => (sent ? navigation.navigate('Status', { person: p, find }) : set({ requested: [...s.requested, p.id] }))}
+        />
       </ScrollView>
     </View>
   );

@@ -483,7 +483,7 @@ const TAGS = {
 
 export function RideComplete({ navigation }: any) {
   const { trip, reset, logRide, wallet } = useTrip();
-  const { s } = useSearch();
+  const { s, set } = useSearch();
   const { top, bottom } = useSafeAreaInsets();
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [tags, setTags] = useState<Record<string, string[]>>({});
@@ -492,6 +492,7 @@ export function RideComplete({ navigation }: any) {
   const done = () => {
     logRide({ role: trip.role, from: s.from, to: s.to, when: s.when, pts: total, people: rider ? trip.driver?.name ?? 'Driver' : trip.riders.map(r => r.name).join(', ') });
     reset();
+    set({ requested: [] });
     navigation.popToTop();
   };
   const toggleTag = (id: string, tag: string) => setTags(x => ({ ...x, [id]: (x[id] ?? []).includes(tag) ? (x[id] ?? []).filter(v => v !== tag) : [...(x[id] ?? []), tag] }));

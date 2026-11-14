@@ -11,7 +11,7 @@ import { ThemeProvider, themed, useTheme } from './src/themeContext';
 import { colors } from './src/theme';
 import { AddVehicle, Vehicles } from './src/screens/Vehicles';
 import { Chat } from './src/screens/Chat';
-import { CancelRide, History, Settings, Wallet } from './src/screens/More';
+import { CancelRide, History, Profile, Settings, Wallet } from './src/screens/More';
 import { Onboarding, Otp, Phone } from './src/screens/Auth';
 import { Home } from './src/screens/Home';
 import { Drop } from './src/screens/Drop';
@@ -46,6 +46,7 @@ const Screens = {
   Settings: themed(Settings),
   History: themed(History),
   Wallet: themed(Wallet),
+  Profile: themed(Profile),
   Menu: themed(Menu),
 };
 
@@ -82,6 +83,7 @@ function Shell() {
           <Stack.Screen name="Settings" component={Screens.Settings} />
           <Stack.Screen name="History" component={Screens.History} />
           <Stack.Screen name="Wallet" component={Screens.Wallet} />
+          <Stack.Screen name="Profile" component={Screens.Profile} />
           <Stack.Screen name="Menu" component={Screens.Menu} options={{ animation: 'slide_from_left' }} />
         </Stack.Navigator>
       </NavigationContainer>
