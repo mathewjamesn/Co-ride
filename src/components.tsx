@@ -242,10 +242,66 @@ export const PersonCard = ({ p, cta, done, onCta, onPress, onChat, onCall }: { p
         </Pressable>
       </View>
     </View>
+    {done ? (
+      <Pressable accessibilityRole="button" onPress={onCta} hitSlop={8} style={{ alignSelf: 'center', minHeight: 40, justifyContent: 'center', marginTop: 6 }}>
+        <Text style={{ color: colors.blue, fontWeight: '800', fontSize: 15, textDecorationLine: 'underline' }}>View details</Text>
+      </Pressable>
+    ) : null}
   </Pressable>
 );
 
+/** Miniature result row: no photo or contact buttons, just the numbers that matter. */
+export const CompactCard = ({ p, cta, done, onCta, onPress }: { p: Person; cta: string; done?: boolean; onCta: () => void; onPress?: () => void }) => {
+  const strong = p.match >= 90;
+  return (
+    <Pressable onPress={onPress} style={s.compact}>
+      <View style={[s.row, { justifyContent: 'space-between' }]}>
+        <View style={[s.row, { flex: 1 }]}>
+          <Icon name={p.verified ? 'shield-check' : 'shield-alert-outline'} size={18} color={p.verified ? colors.green : colors.muted} />
+          <Text style={s.cName} numberOfLines={1}>{p.name}</Text>
+          <Text style={s.cMeta}>★ {p.rating}</Text>
+        </View>
+        <View style={[s.matchChip, { paddingHorizontal: 10, paddingVertical: 3, backgroundColor: strong ? colors.greenTint : colors.warnTint }]}>
+          <Text style={{ color: strong ? colors.green : colors.warnText, fontWeight: '800', fontSize: 14 }}>{p.match}%</Text>
+        </View>
+      </View>
+      <View style={[s.leg, { marginTop: 8, padding: 8 }]}>
+        <Icon name="walk" size={17} color={colors.muted} />
+        <Text style={s.legT}>{p.walkTo}</Text>
+        <Icon name="chevron-right" size={15} color={colors.muted} />
+        <Icon name={p.vehicle === 'bike' ? 'motorbike' : 'car'} size={17} color={colors.text} />
+        <Text style={s.legT}>{p.ride}</Text>
+        <Icon name="chevron-right" size={15} color={colors.muted} />
+        <Icon name="walk" size={17} color={colors.muted} />
+        <Text style={s.legT}>{p.walkFrom}</Text>
+      </View>
+      <View style={[s.row, { justifyContent: 'space-between', marginTop: 8 }]}>
+        <View style={s.row}>
+          <Icon name="clock-outline" size={16} color={colors.muted} />
+          <Text style={s.cTime}>{p.time}</Text>
+          <Text style={s.cMeta}>· {p.points} pts</Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={done ? `${cta}. View details` : cta} onPress={onCta} style={[s.ctaSm, done && s.ctaDone]}>
+          {done ? <Icon name="check-circle" size={16} color={colors.green} /> : null}
+          <Text style={[s.ctaSmText, done && { color: colors.green }]}>{cta}</Text>
+        </Pressable>
+      </View>
+      {done ? (
+        <Pressable accessibilityRole="button" onPress={onCta} hitSlop={8} style={{ alignSelf: 'center', minHeight: 34, justifyContent: 'center', marginTop: 4 }}>
+          <Text style={{ color: colors.blue, fontWeight: '800', fontSize: 14, textDecorationLine: 'underline' }}>View details</Text>
+        </Pressable>
+      ) : null}
+    </Pressable>
+  );
+};
+
 const s = makeStyles(() => ({
+  compact: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: 12, marginBottom: 10 },
+  cName: { fontSize: 16, fontWeight: '800', color: colors.text, flexShrink: 1 },
+  cMeta: { fontSize: 13, fontWeight: '600', color: colors.muted },
+  cTime: { fontSize: 16, fontWeight: '800', color: colors.text },
+  ctaSm: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.ink, borderRadius: radius.pill, paddingHorizontal: 18, height: 40 },
+  ctaSmText: { color: colors.accent, fontSize: 15, fontWeight: '800' },
   btn: { minHeight: 56, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', minWidth: TOUCH },
   btnText: { fontSize: 17, fontWeight: '800' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },

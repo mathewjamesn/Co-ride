@@ -6,6 +6,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SearchProvider } from './src/state';
 import { TripProvider } from './src/trip';
 import { GarageProvider } from './src/garage';
+import { AuthProvider } from './src/auth';
+import { Email, EmailOtp, Endorse, IdVerify, VerifyChoice, VerifyStatus } from './src/screens/Verify';
 import { ChatProvider } from './src/chat';
 import { ThemeProvider, themed, useTheme } from './src/themeContext';
 import { colors } from './src/theme';
@@ -27,6 +29,12 @@ const Screens = {
   Onboarding: themed(Onboarding),
   Phone: themed(Phone),
   Otp: themed(Otp),
+  Email: themed(Email),
+  EmailOtp: themed(EmailOtp),
+  VerifyChoice: themed(VerifyChoice),
+  Endorse: themed(Endorse),
+  IdVerify: themed(IdVerify),
+  VerifyStatus: themed(VerifyStatus),
   Home: themed(Home),
   Drop: themed(Drop),
   Plan: themed(Plan),
@@ -64,6 +72,12 @@ function Shell() {
           <Stack.Screen name="Onboarding" component={Screens.Onboarding} />
           <Stack.Screen name="Phone" component={Screens.Phone} />
           <Stack.Screen name="Otp" component={Screens.Otp} />
+          <Stack.Screen name="Email" component={Screens.Email} />
+          <Stack.Screen name="EmailOtp" component={Screens.EmailOtp} />
+          <Stack.Screen name="VerifyChoice" component={Screens.VerifyChoice} />
+          <Stack.Screen name="Endorse" component={Screens.Endorse} />
+          <Stack.Screen name="IdVerify" component={Screens.IdVerify} />
+          <Stack.Screen name="VerifyStatus" component={Screens.VerifyStatus} />
           <Stack.Screen name="Home" component={Screens.Home} />
           <Stack.Screen name="Drop" component={Screens.Drop} />
           <Stack.Screen name="Plan" component={Screens.Plan} />
@@ -95,6 +109,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
+        <AuthProvider>
         <SearchProvider>
           <GarageProvider>
             <TripProvider>
@@ -104,6 +119,7 @@ export default function App() {
             </TripProvider>
           </GarageProvider>
         </SearchProvider>
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

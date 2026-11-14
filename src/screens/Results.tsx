@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Button, Header, MapMock, PersonCard, Segmented, T, Toggle } from '../components';
+import { Avatar, Button, CompactCard, Header, MapMock, PersonCard, Segmented, T, Toggle } from '../components';
 import { colors, radius, makeStyles } from '../theme';
 import { Person, rideGivers, rideTakers } from '../data';
 import { useSearch } from '../state';
@@ -75,6 +75,7 @@ export function Results({ navigation, route }: any) {
   const find = s.mode === 'find';
   const [sort, setSort] = useState<Sort>(route.params?.sort ?? 'recommended');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [view, setView] = useState<'detailed' | 'compact'>('detailed');
   const base = find ? rideGivers : rideTakers;
   const data = useMemo(() => sortList(base.filter(p => !verifiedOnly || p.verified), sort), [base, sort, verifiedOnly]);
   const noun = find ? 'ride givers' : 'ride takers';
@@ -92,11 +93,17 @@ export function Results({ navigation, route }: any) {
         data={data}
         keyExtractor={p => p.id}
         contentContainerStyle={{ padding: 16 }}
+        extraData={view}
         ListHeaderComponent={
-          <View style={st.summary}>
-            <Icon name="map-marker-path" size={22} color={colors.text} />
-            <T style={{ flex: 1, marginLeft: 8 }} numberOfLines={1}>{s.from} → {s.to}</T>
-            <T v="label" color={colors.muted}>11 KM</T>
+          <View>
+            <View style={{ marginBottom: 12 }}>
+              <Segmented value={view} options={[['detailed', 'Detailed'], ['compact', 'Compact']]} onChange={setView} />
+            </View>
+            <View style={st.summary}>
+              <Icon name="map-marker-path" size={22} color={colors.text} />
+              <T style={{ flex: 1, marginLeft: 8 }} numberOfLines={1}>{s.from} → {s.to}</T>
+              <T v="label" color={colors.muted}>11 KM</T>
+            </View>
           </View>
         }
         ListEmptyComponent={
@@ -106,10 +113,18 @@ export function Results({ navigation, route }: any) {
             <Button title="Reset filters" onPress={() => setVerifiedOnly(false)} />
           </View>
         }
-        renderItem={({ item, index }) => (
+        renderItem={({ item, index }) => view === 'compact' ? (
+          <CompactCard
+            p={item}
+            cta={s.requested.includes(item.id) ? (find ? 'Requested' : 'Offered') : find ? 'Request' : 'Offer'}
+            done={s.requested.includes(item.id)}
+            onCta={() => (s.requested.includes(item.id) ? navigation.navigate('Status', { person: item, find }) : set({ requested: [...s.requested, item.id] }))}
+            onPress={() => navigation.navigate('Route', { list: data, index })}
+          />
+        ) : (
           <PersonCard
             p={item}
-            cta={s.requested.includes(item.id) ? (find ? 'Requested · View' : 'Offered · View') : find ? 'Request' : 'Offer'}
+            cta={s.requested.includes(item.id) ? (find ? 'Requested' : 'Offered') : find ? 'Request' : 'Offer'}
             done={s.requested.includes(item.id)}
             onCta={() => (s.requested.includes(item.id) ? navigation.navigate('Status', { person: item, find }) : set({ requested: [...s.requested, item.id] }))}
             onPress={() => navigation.navigate('Route', { list: data, index })}
@@ -122,72 +137,136 @@ export function Results({ navigation, route }: any) {
   );
 }
 
-/** Route detail with pickup/drop and pager through matches */
+/** One step of the journey, drawn as a vertical timeline. */
+const Step = ({ icon, color, title, sub, last }: { icon: string; color: string; title: string; sub: string; last?: boolean }) => (
+  <View style={{ flexDirection: 'row', gap: 12 }}>
+    <View style={{ alignItems: 'center', width: 30 }}>
+      <View style={[st.stepDot, { backgroundColor: color }]}><Icon name={icon as any} size={16} color={colors.onInk} /></View>
+      {!last ? <View style={st.stepLine} /> : null}
+    </View>
+    <View style={{ flex: 1, paddingBottom: last ? 0 : 14 }}>
+      <T v="bodyStrong">{title}</T>
+      <T v="small" color={colors.muted}>{sub}</T>
+    </View>
+  </View>
+);
+
+/**
+ * Route detail. The map fills the screen; the details live in a bottom sheet that can be
+ * peeked (summary + button), expanded (full timeline), or hidden by tapping the map.
+ */
 export function RouteDetail({ navigation, route }: any) {
   const { list, index: start }: { list: Person[]; index: number } = route.params;
   const [i, setI] = useState(start);
+  const [mode, setMode] = useState<'peek' | 'full' | 'hidden'>('peek');
+  const [box, setBox] = useState({ w: 360, h: 500 });
   const p = list[i];
   const { s, set } = useSearch();
   const find = s.mode === 'find';
-  const sent = s.requested.includes(list[i].id);
+  const sent = s.requested.includes(p.id);
   const { top, bottom } = useSafeAreaInsets();
+  const strong = p.match >= 90;
+  const vehicle = p.vehicle === 'bike' ? 'Bike' : 'Car';
+  const cta = () => (sent ? navigation.navigate('Status', { person: p, find }) : set({ requested: [...s.requested, p.id] }));
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.white }}>
+    <View style={{ flex: 1, backgroundColor: colors.ground }}>
       <View style={[st.routeHead, { paddingTop: top + 8 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close" style={st.close} onPress={() => navigation.goBack()}><Icon name="close" size={22} color={colors.onInk} /></Pressable>
-        <T v="heading">{find ? `${p.name}'s ride route` : 'Matching ride taker'}</T>
-      </View>
-      <View>
-        <MapMock height={300} />
-        <View style={st.legCard}>
-          <Icon name="walk" size={20} color={colors.muted} /><T v="label">{p.walkTo}</T>
-          <Icon name="chevron-right" size={20} color={colors.muted} />
-          <Icon name={p.vehicle === 'bike' ? 'motorbike' : 'car'} size={20} color={colors.text} />
-          <Icon name="chevron-right" size={20} color={colors.muted} />
-          <Icon name="walk" size={20} color={colors.muted} /><T v="label">{p.walkFrom}</T>
-        </View>
-        <View style={[st.tag, { left: 90, top: 150, borderColor: colors.red }]}><T v="label" color={colors.red}>DROP</T></View>
-        <View style={[st.tag, { right: 16, top: 190, borderColor: colors.green }]}><T v="label" color={colors.green}>PICK UP</T></View>
-        <View style={st.km}><T v="label" color={colors.accent}>{p.ride.replace(' km', ' KM')}</T></View>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Message ${p.name}`} onPress={() => navigation.navigate('Chat', { id: p.id, name: p.name, sub: p.org })} style={st.chat}><Icon name="message-text" size={26} color={colors.accent} /></Pressable>
-      </View>
-      <ScrollView style={st.detailSheet} contentContainerStyle={{ padding: 14, paddingBottom: bottom + 14 }}>
+        <T v="heading" style={{ flex: 1 }} numberOfLines={1}>{find ? `${p.name}'s ride route` : 'Matching ride taker'}</T>
         <View style={st.pager}>
-          <View style={st.pill}><Icon name="map-marker-account" size={18} color={colors.green} /><T v="label">Pickup</T></View>
-          <View style={st.count}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Previous match" onPress={() => setI(Math.max(0, i - 1))}><Icon name="chevron-left" size={28} color={colors.text} /></Pressable>
-            <T v="small" style={{ textAlign: 'center', fontWeight: '700' }}>{i + 1} / {list.length}{'\n'}Matches</T>
-            <Pressable accessibilityRole="button" accessibilityLabel="Next match" onPress={() => setI(Math.min(list.length - 1, i + 1))}><Icon name="chevron-right" size={28} color={colors.text} /></Pressable>
-          </View>
-          <View style={st.pill}><Icon name="map-marker" size={18} color={colors.red} /><T v="label">Drop</T></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Previous match" hitSlop={6} onPress={() => setI(Math.max(0, i - 1))}><Icon name="chevron-left" size={26} color={i === 0 ? colors.muted : colors.text} /></Pressable>
+          <T v="label">{i + 1}/{list.length}</T>
+          <Pressable accessibilityRole="button" accessibilityLabel="Next match" hitSlop={6} onPress={() => setI(Math.min(list.length - 1, i + 1))}><Icon name="chevron-right" size={26} color={i === list.length - 1 ? colors.muted : colors.text} /></Pressable>
         </View>
-        <View style={st.person}>
-          <View style={{ alignItems: 'center' }}><Avatar name={p.name} size={72} /><T v="small" style={{ marginTop: 4 }}>Today</T></View>
-          <View style={{ flex: 1, marginLeft: 14 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <View style={{ flex: 1 }}>
-                <T v="title">{p.name}</T>
-                <T v="label" color={p.verified ? colors.green : colors.muted}>{p.verified ? 'Verified' : 'Not verified'}</T>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <T v="small" style={{ fontWeight: '700' }}>Route match</T>
-                <T v="display" color={colors.text}>{p.match}%</T>
-                <T v="label" color={colors.blue}>{p.points} pts</T>
-              </View>
-            </View>
-            <T v="small" style={{ marginTop: 4 }}>★ {p.rating} ({p.reviews})  ·  {p.time}</T>
-          </View>
+      </View>
+
+      <View style={{ flex: 1 }} onLayout={e => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+        {/* Tap the map to hide or bring back the details */}
+        <Pressable accessibilityRole="button" accessibilityLabel={mode === 'hidden' ? 'Show details' : 'Hide details, show full map'} onPress={() => setMode(mode === 'hidden' ? 'peek' : 'hidden')} style={StyleAbs}>
+          <MapMock height={box.h} />
+        </Pressable>
+
+        {/* Map labels: kept short, and larger when the sheet is hidden */}
+        <View pointerEvents="none" style={[st.tag, { left: 0.78 * 360 - 96, top: 0.15 * box.h + 12, borderColor: colors.green }]}>
+          <T v="label" color={colors.green}>PICK UP · {p.walkTo}</T>
         </View>
-        <Button
-          title={sent ? (find ? 'Request sent · View' : 'Offer sent · View') : find ? 'Request to join' : 'Offer ride'}
-          icon={sent ? 'check-circle' : undefined}
-          variant={sent ? 'outline' : 'lime'}
-          onPress={() => (sent ? navigation.navigate('Status', { person: p, find }) : set({ requested: [...s.requested, p.id] }))}
-        />
-      </ScrollView>
+        <View pointerEvents="none" style={[st.tag, { left: 0.18 * 360 + 22, top: 0.88 * box.h - 42, borderColor: colors.red }]}>
+          <T v="label" color={colors.red}>DROP · {p.walkFrom}</T>
+        </View>
+        <View pointerEvents="none" style={[st.km, { left: 130, top: 0.38 * box.h }]}><T v="label" color={colors.accent}>{p.ride.replace(' km', ' KM')}</T></View>
+
+        <Pressable accessibilityRole="button" accessibilityLabel={mode === 'hidden' ? 'Show details' : 'Full screen map'} onPress={() => setMode(mode === 'hidden' ? 'peek' : 'hidden')} style={st.mapBtn}>
+          <Icon name={mode === 'hidden' ? 'arrow-collapse' : 'arrow-expand'} size={22} color={colors.text} />
+        </Pressable>
+
+        {mode === 'hidden' ? (
+          <Pressable accessibilityRole="button" onPress={() => setMode('peek')} style={[st.showBar, { bottom: bottom + 16 }]}>
+            <Icon name="chevron-up" size={22} color={colors.accent} />
+            <T v="label" color={colors.onInk}>{p.name} · {p.match}% · Show details</T>
+          </Pressable>
+        ) : (
+          <View style={[st.sheetBox, { paddingBottom: bottom + 12, maxHeight: box.h * (mode === 'full' ? 0.82 : 0.5) }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={mode === 'full' ? 'Collapse details' : 'Expand details'} onPress={() => setMode(mode === 'full' ? 'peek' : 'full')} style={st.grabArea}>
+              <View style={st.grab} />
+            </Pressable>
+            <ScrollView scrollEnabled={mode === 'full'} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+              <View style={st.who}>
+                <Avatar name={p.name} size={52} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <T v="heading" numberOfLines={1}>{p.name}</T>
+                  <T v="small" color={p.verified ? colors.green : colors.muted}>{p.verified ? 'Verified' : 'Not verified'} · ★ {p.rating} ({p.reviews})</T>
+                </View>
+                <View style={[st.matchPill, { backgroundColor: strong ? colors.greenTint : colors.warnTint }]}>
+                  <T v="heading" color={strong ? colors.green : colors.warnText}>{p.match}%</T>
+                  <T v="small" color={strong ? colors.green : colors.warnText}>match</T>
+                </View>
+              </View>
+
+              <View style={st.stats}>
+                <View style={st.stat}><T v="small" color={colors.muted}>Pick up</T><T v="label">{p.time}</T></View>
+                <View style={st.statSep} />
+                <View style={st.stat}><T v="small" color={colors.muted}>Ride</T><T v="label">{p.ride}</T></View>
+                <View style={st.statSep} />
+                <View style={st.stat}><T v="small" color={colors.muted}>Fare</T><T v="label">{p.points} pts</T></View>
+              </View>
+
+              {mode === 'full' ? (
+                <View style={{ marginTop: 16 }}>
+                  <T v="label" color={colors.muted} style={{ marginBottom: 10 }}>YOUR JOURNEY</T>
+                  <Step icon="walk" color={colors.muted} title={`Walk ${p.walkTo} to pick-up point`} sub={s.from} />
+                  <Step icon="map-marker-account" color={colors.green} title={`Picked up at ${p.time}`} sub={`${p.name} meets you here`} />
+                  <Step icon={p.vehicle === 'bike' ? 'motorbike' : 'car'} color={colors.text} title={`${vehicle} ride · ${p.ride}`} sub={`About ${Math.round(parseFloat(p.ride) * 3)} min`} />
+                  <Step icon="map-marker" color={colors.red} title="Dropped near your destination" sub={s.to} />
+                  <Step icon="walk" color={colors.muted} title={`Walk ${p.walkFrom} to destination`} sub={s.to} last />
+                  <View style={st.contactRow}>
+                    <Pressable accessibilityRole="button" onPress={callNumber} style={st.contactBtn}><Icon name="phone-outline" size={22} color={colors.text} /><T v="label">Call</T></Pressable>
+                    <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Chat', { id: p.id, name: p.name, sub: p.org })} style={st.contactBtn}><Icon name="message-outline" size={22} color={colors.text} /><T v="label">Message</T></Pressable>
+                  </View>
+                </View>
+              ) : null}
+
+              <Button
+                style={{ marginTop: 14 }}
+                title={sent ? (find ? 'Request sent · View' : 'Offer sent · View') : find ? 'Request to join' : 'Offer ride'}
+                icon={sent ? 'check-circle' : undefined}
+                variant={sent ? 'outline' : 'lime'}
+                onPress={cta}
+              />
+              {mode === 'peek' ? (
+                <Pressable accessibilityRole="button" onPress={() => setMode('full')} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+                  <T v="label" color={colors.blue}>See full journey</T>
+                </Pressable>
+              ) : null}
+            </ScrollView>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
+
+const StyleAbs = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } as const;
 
 /** Sort / Preferences filter */
 export function Filter({ navigation, route }: any) {
@@ -225,6 +304,20 @@ export function Filter({ navigation, route }: any) {
 }
 
 const st = makeStyles(() => ({
+  stepDot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  stepLine: { width: 2, flex: 1, backgroundColor: colors.line, marginVertical: 2 },
+  pager: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: colors.white, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, height: 44 },
+  mapBtn: { position: 'absolute', right: 14, top: 14, width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  showBar: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.ink, borderRadius: radius.pill, paddingHorizontal: 18, height: 52, elevation: 6 },
+  sheetBox: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, elevation: 10 },
+  grabArea: { height: 28, alignItems: 'center', justifyContent: 'center' },
+  who: { flexDirection: 'row', alignItems: 'center' },
+  matchPill: { borderRadius: radius.lg, paddingHorizontal: 12, paddingVertical: 4, alignItems: 'center' },
+  stats: { flexDirection: 'row', backgroundColor: colors.ground, borderRadius: radius.md, paddingVertical: 10, marginTop: 12 },
+  stat: { flex: 1, alignItems: 'center' },
+  statSep: { width: 1, backgroundColor: colors.line },
+  contactRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  contactBtn: { flex: 1, minHeight: 48, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.line, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
   matchBar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line },
   barBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' },
   sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 16, marginTop: -18, elevation: 8 },
@@ -237,14 +330,7 @@ const st = makeStyles(() => ({
   summary: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.lg, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.line },
   routeHead: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingBottom: 12 },
   close: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
-  legCard: { position: 'absolute', top: 10, left: 14, right: 14, backgroundColor: colors.white, borderRadius: radius.md, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 3 },
   tag: { position: 'absolute', backgroundColor: colors.white, borderWidth: 2, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   km: { position: 'absolute', left: 150, top: 110, backgroundColor: colors.ink, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  chat: { position: 'absolute', right: 14, bottom: 30, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', elevation: 4 },
-  detailSheet: { flex: 1, marginTop: -16, backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl },
-  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.lime, borderRadius: radius.xl, padding: 10, marginBottom: 14 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white, borderWidth: 2, borderColor: colors.text, borderRadius: radius.pill, paddingHorizontal: 12, height: 46 },
-  count: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.pill, paddingHorizontal: 8, height: 54 },
-  person: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: 14, marginBottom: 14 },
   opt: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, minHeight: 68 },
 }));

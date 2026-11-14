@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, T, TopBar } from '../components';
+import { Button, Segmented, T, TopBar } from '../components';
+import { useAuth } from '../auth';
 import { colors, radius, makeStyles } from '../theme';
 
 export const Logo = ({ size = 150 }: { size?: number }) => (
@@ -19,6 +20,7 @@ const slides = [
 
 /** First screen for a new user: Carpool intro + enter phone number */
 export function Onboarding({ navigation }: any) {
+  const { auth, signInAs } = useAuth();
   const { width } = useWindowDimensions();
   const [i, setI] = useState(0);
   const ref = useRef<FlatList>(null);
@@ -48,6 +50,10 @@ export function Onboarding({ navigation }: any) {
       />
       <View style={s.dots}>
         {slides.map((_, k) => <View key={k} style={[s.dot, k === i && { backgroundColor: colors.ink, width: 24 }]} />)}
+      </View>
+      <View style={s.proto}>
+        <T v="small" color={colors.muted}>PROTOTYPE · walk through as</T>
+        <Segmented value={auth.kind} options={[['new', 'New user'], ['verified', 'Verified user']]} onChange={signInAs} />
       </View>
       <Button title="Enter your phone number" style={{ marginHorizontal: 24 }} onPress={() => navigation.navigate('Phone')} />
       <T v="small" color={colors.muted} style={s.terms}>By continuing, I agree to Go-Pool <T v="small" color={colors.blue} style={{ fontWeight: '700' }}>Terms</T></T>
@@ -79,6 +85,7 @@ export function Phone({ navigation }: any) {
 
 /** OTP verification (prototype: any 4 digits accepted) */
 export function Otp({ navigation, route }: any) {
+  const { auth } = useAuth();
   const [code, setCode] = useState('');
   return (
     <View style={s.flexGround}>
@@ -89,13 +96,14 @@ export function Otp({ navigation, route }: any) {
           <TextInput style={[s.input, { letterSpacing: 16, textAlign: 'center', fontSize: 28 }]} keyboardType="number-pad" maxLength={4} value={code} onChangeText={setCode} accessibilityLabel="OTP code" />
           <T v="small" color={colors.muted} style={{ marginTop: 12 }}>Prototype: any 4 digits will work.</T>
         </ScrollView>
-        <Button title="Verify" variant="lime" disabled={code.length !== 4} style={{ margin: 16 }} onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] })} />
+        <Button title="Verify" variant="lime" disabled={code.length !== 4} style={{ margin: 16 }} onPress={() => (auth.kind === 'new' ? navigation.navigate('Email') : navigation.reset({ index: 0, routes: [{ name: 'Home' }] }))} />
       </KeyboardAvoidingView>
     </View>
   );
 }
 
 const s = makeStyles(() => ({
+  proto: { marginHorizontal: 24, marginBottom: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.line, borderRadius: radius.md, padding: 10, gap: 8 },
   flex: { flex: 1, backgroundColor: colors.ground },
   flexGround: { flex: 1, backgroundColor: colors.ground },
   h1: { textAlign: 'center', marginTop: 24 },

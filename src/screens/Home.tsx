@@ -6,6 +6,7 @@ import { BottomNav, Segmented, T } from '../components';
 import { colors, radius, shadow, makeStyles } from '../theme';
 import { Place, PresetKey, allPlaces, presetPlaces, quickPlaces } from '../data';
 import { useSearch } from '../state';
+import { useAuth } from '../auth';
 
 /** Place list shown when a shortcut (Recent, Favourites, a preset) is expanded. */
 function PlaceMenu({ title, items, empty, icon = 'map-marker', onPick, onClose }: { title: string; items: Place[]; empty: string; icon?: string; onPick: (p: Place) => void; onClose: () => void }) {
@@ -44,12 +45,21 @@ const quickTiles = [
 /** Landing screen: Find a Pool / Offer Pool, "Where would you like to go?", shortcuts. */
 export function Home({ navigation }: any) {
   const { s, set, addRecent } = useSearch();
+  const { auth, verified, nextStep } = useAuth();
   const { top } = useSafeAreaInsets();
   const [open, setOpen] = useState<'recent' | 'fav' | PresetKey | null>(null);
   const [presetsOpen, setPresetsOpen] = useState(false);
   const find = s.mode === 'find';
 
+  /** Finding or offering a pool needs a verified account. */
+  const ensureVerified = () => {
+    if (verified) return true;
+    navigation.navigate(nextStep() ?? 'VerifyStatus');
+    return false;
+  };
+
   const pick = (p: Place) => {
+    if (!ensureVerified()) return;
     set({ to: p.name });
     addRecent(p.name);
     setOpen(null);
@@ -102,10 +112,20 @@ export function Home({ navigation }: any) {
         </View>
 
         <View style={{ paddingHorizontal: 16, gap: 14 }}>
+          {!verified ? (
+            <Pressable accessibilityRole="button" onPress={ensureVerified} style={st.verifyBanner}>
+              <Icon name={auth.status === 'pending' ? 'clock-outline' : 'shield-alert-outline'} size={26} color={colors.warnText} />
+              <View style={{ flex: 1 }}>
+                <T v="label" color={colors.warnText}>{auth.status === 'pending' ? 'Verification in progress' : 'Verify to start riding'}</T>
+                <T v="small" color={colors.warnText}>{auth.status === 'pending' ? 'Tap to see where it stands.' : 'Confirm who you are to find or offer a pool.'}</T>
+              </View>
+              <Icon name="chevron-right" size={24} color={colors.warnText} />
+            </Pressable>
+          ) : null}
           <Segmented value={s.mode} options={[['find', 'Find a Pool'], ['offer', 'Offer Pool']]} onChange={m => set({ mode: m })} />
 
           <View>
-            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Drop')} style={st.search}>
+            <Pressable accessibilityRole="button" onPress={() => ensureVerified() && navigation.navigate('Drop')} style={st.search}>
               <Icon name="magnify" size={24} color={colors.text} />
               <T v="heading">Where would you like to go?</T>
             </Pressable>
@@ -177,5 +197,6 @@ const st = makeStyles(() => ({
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 },
   shortcut: { flex: 1, backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 4 },
   shortIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.lime, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  verifyBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.warnTint, borderColor: colors.warnLine, borderWidth: 1, borderRadius: radius.lg, padding: 14, minHeight: 64 },
   divider: { height: 1, backgroundColor: colors.line, marginVertical: 8 },
 }));

@@ -7,6 +7,7 @@ import { colors, makeStyles, radius } from '../theme';
 import { Pref, useTheme } from '../themeContext';
 import { RideLog, useTrip } from '../trip';
 import { useSearch } from '../state';
+import { methodLabel, useAuth } from '../auth';
 
 /* ------------------------------------------------------------------ */
 /* Settings: appearance + screen-on                                    */
@@ -187,6 +188,7 @@ export function Wallet({ navigation }: any) {
 
 export function Profile({ navigation }: any) {
   const { history } = useTrip();
+  const { auth, verified, nextStep, signInAs } = useAuth();
   const { top } = useSafeAreaInsets();
   const done = history.filter(h => !h.cancelled);
   const taken = done.filter(h => h.role === 'rider').length;
@@ -203,10 +205,18 @@ export function Profile({ navigation }: any) {
         <View style={[st.profileHead, { paddingTop: top + 24 }]}>
           <Avatar name="Mathew" size={84} />
           <T v="title" color={colors.onInk} style={{ marginTop: 12 }}>Mathew</T>
-          <View style={st.verified}>
-            <Icon name="shield-check" size={16} color={colors.green} />
-            <T v="label" color={colors.green}>Phone verified</T>
-          </View>
+          {auth.email ? <T v="small" color={colors.darkMuted} style={{ marginTop: 2 }}>{auth.email}</T> : null}
+          {verified ? (
+            <View style={st.verified}>
+              <Icon name="shield-check" size={16} color={colors.green} />
+              <T v="label" color={colors.green}>Verified · {methodLabel(auth.method)}</T>
+            </View>
+          ) : (
+            <Pressable accessibilityRole="button" onPress={() => navigation.navigate(nextStep() ?? 'VerifyStatus')} style={[st.verified, { backgroundColor: colors.warnTint }]}>
+              <Icon name="shield-alert-outline" size={16} color={colors.warnText} />
+              <T v="label" color={colors.warnText}>{auth.status === 'pending' ? 'Verification in progress' : 'Not verified · Verify now'}</T>
+            </Pressable>
+          )}
         </View>
         <View style={st.stats}>
           <View style={st.stat}><T v="title">{taken}</T><T v="small" color={colors.muted}>Rides taken</T></View>
@@ -225,7 +235,7 @@ export function Profile({ navigation }: any) {
             </Pressable>
           ))}
         </View>
-        <Button title="Log out" icon="logout" variant="outline" style={{ marginHorizontal: 16, marginTop: 16 }} onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] })} />
+        <Button title="Log out" icon="logout" variant="outline" style={{ marginHorizontal: 16, marginTop: 16 }} onPress={() => { signInAs('new'); navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] }); }} />
       </ScrollView>
       <BottomNav active="Profile" navigation={navigation} />
     </View>

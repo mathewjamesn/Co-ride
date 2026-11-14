@@ -8,7 +8,31 @@ import { useSearch } from '../state';
 import { useGarage, vehicleName } from '../garage';
 import { useTrip } from '../trip';
 
-const DAYS = ['Today', 'Tomorrow'];
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const pad = (n: number) => (n < 10 ? '0' + n : String(n));
+
+/** The next two weeks, so any day of the week can be picked. */
+function buildDays() {
+  const now = new Date();
+  return Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+    const wd = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : WD[d.getDay()];
+    return { label: i < 2 ? wd : `${WD[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`, wd, date: d.getDate(), mon: MON[d.getMonth()] };
+  });
+}
+
+const Stepper = ({ label, value, onUp, onDown }: { label: string; value: string; onUp: () => void; onDown: () => void }) => (
+  <View style={{ alignItems: 'center' }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`More ${label}`} onPress={onUp} style={st.step}>
+      <Icon name="chevron-up" size={24} color={colors.text} />
+    </Pressable>
+    <T v="title" style={{ marginVertical: 4, minWidth: 48, textAlign: 'center' }}>{value}</T>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Less ${label}`} onPress={onDown} style={st.step}>
+      <Icon name="chevron-down" size={24} color={colors.text} />
+    </Pressable>
+  </View>
+);
 const TIMES = ['5:00 PM', '5:35 PM', '6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM', '8:30 PM'];
 const WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const KM = 11;
@@ -26,7 +50,13 @@ export function Plan({ navigation }: any) {
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [days, setDays] = useState<boolean[]>([true, true, true, true, true, false, false]);
 
-  const [day, time] = s.when.split(', ');
+  const cut = s.when.lastIndexOf(', ');
+  const day = s.when.slice(0, cut);
+  const time = s.when.slice(cut + 2);
+  const dayOptions = buildDays();
+  const tm = /^(\d{1,2}):(\d{2}) (AM|PM)$/.exec(time) ?? ['', '5', '35', 'PM'];
+  const hh = parseInt(tm[1], 10), mm = parseInt(tm[2], 10), ap = tm[3];
+  const setTime = (h: number, m: number, a: string) => set({ when: `${day}, ${h}:${pad(m)} ${a}` });
   const maxSeats = find ? 4 : active?.seats ?? 1;
   const seats = Math.min(s.seats, maxSeats);
   const to = s.to || 'Choose a drop location';
@@ -152,23 +182,48 @@ export function Plan({ navigation }: any) {
       <Modal visible={timeOpen} transparent animationType="slide" onRequestClose={() => setTimeOpen(false)}>
         <View style={st.scrim}>
           <Pressable style={{ flex: 1 }} accessibilityLabel="Close" onPress={() => setTimeOpen(false)} />
-          <View style={[st.sheet, { paddingBottom: bottom + 20 }]}>
+          <View style={[st.sheet, { paddingBottom: bottom + 20, maxHeight: '90%' }]}>
             <T v="title">When do you want to go?</T>
-            <View style={st.dayTabs}>
-              {DAYS.map(d => (
-                <Pressable key={d} accessibilityRole="tab" accessibilityState={{ selected: d === day }} onPress={() => set({ when: `${d}, ${time}` })} style={[st.dayTab, d === day && { backgroundColor: colors.ink }]}>
-                  <T v="label" color={d === day ? colors.accent : colors.text}>{d}</T>
-                </Pressable>
-              ))}
-            </View>
-            <View style={st.timeGrid}>
-              {TIMES.map(t => (
-                <Pressable key={t} accessibilityRole="button" accessibilityState={{ selected: t === time }} onPress={() => set({ when: `${day}, ${t}` })} style={[st.time, t === time && { backgroundColor: colors.lime, borderColor: colors.text }]}>
-                  <T v="label">{t}</T>
-                </Pressable>
-              ))}
-            </View>
-            <Button title="Done" style={{ marginTop: 18 }} onPress={() => setTimeOpen(false)} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <T v="label" color={colors.muted} style={st.sec}>DAY</T>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {dayOptions.map(d => {
+                  const on = d.label === day;
+                  return (
+                    <Pressable key={d.label} accessibilityRole="button" accessibilityLabel={d.label} accessibilityState={{ selected: on }} onPress={() => set({ when: `${d.label}, ${time}` })} style={[st.dayCard, on && { backgroundColor: colors.ink, borderColor: colors.ink }]}>
+                      <T v="small" color={on ? colors.accent : colors.muted} style={{ fontWeight: '700' }}>{d.wd}</T>
+                      <T v="title" color={on ? colors.onInk : colors.text}>{d.date}</T>
+                      <T v="small" color={on ? colors.darkMuted : colors.muted}>{d.mon}</T>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              <T v="label" color={colors.muted} style={st.sec}>TIME</T>
+              <View style={st.timeGrid}>
+                {TIMES.map(x => (
+                  <Pressable key={x} accessibilityRole="button" accessibilityState={{ selected: x === time }} onPress={() => set({ when: `${day}, ${x}` })} style={[st.time, x === time && { backgroundColor: colors.lime, borderColor: colors.text }]}>
+                    <T v="label">{x}</T>
+                  </Pressable>
+                ))}
+              </View>
+
+              <T v="label" color={colors.muted} style={st.sec}>OR PICK ANY TIME</T>
+              <View style={st.custom}>
+                <Stepper label="hour" value={String(hh)} onUp={() => setTime(hh === 12 ? 1 : hh + 1, mm, ap)} onDown={() => setTime(hh === 1 ? 12 : hh - 1, mm, ap)} />
+                <T v="title">:</T>
+                <Stepper label="minutes" value={pad(mm)} onUp={() => setTime(hh, (mm + 5) % 60, ap)} onDown={() => setTime(hh, (mm + 55) % 60, ap)} />
+                <View style={{ gap: 8 }}>
+                  {['AM', 'PM'].map(x => (
+                    <Pressable key={x} accessibilityRole="button" accessibilityState={{ selected: ap === x }} onPress={() => setTime(hh, mm, x)} style={[st.ampm, ap === x && { backgroundColor: colors.ink, borderColor: colors.ink }]}>
+                      <T v="label" color={ap === x ? colors.accent : colors.text}>{x}</T>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
+            <T v="bodyStrong" style={{ textAlign: 'center', marginTop: 12 }}>{s.when}</T>
+            <Button title="Done" style={{ marginTop: 12 }} onPress={() => setTimeOpen(false)} />
           </View>
         </View>
       </Modal>
@@ -189,6 +244,10 @@ const st = makeStyles(() => ({
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: 14, gap: 16 },
   optRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   day: { flex: 1, minHeight: 44, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.text, alignItems: 'center', justifyContent: 'center' },
+  sec: { marginTop: 16, marginBottom: 8 },
+  dayCard: { width: 70, minHeight: 88, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', gap: 1 },
+  custom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, backgroundColor: colors.ground, borderRadius: radius.lg, padding: 12 },
+  ampm: { width: 64, minHeight: 44, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 20 },
   dayTabs: { flexDirection: 'row', backgroundColor: colors.ground, borderRadius: radius.pill, padding: 4, gap: 4, marginVertical: 14 },
