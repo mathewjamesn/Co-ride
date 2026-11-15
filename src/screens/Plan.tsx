@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +46,7 @@ export function Plan({ navigation }: any) {
   const find = s.mode === 'find';
   const [timeOpen, setTimeOpen] = useState(false);
   const [more, setMore] = useState(false);
+  const scroller = useRef<ScrollView>(null);
   const [rate, setRate] = useState(5);
   const [auto, setAuto] = useState(true);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
@@ -69,7 +70,7 @@ export function Plan({ navigation }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scroller} contentContainerStyle={{ paddingBottom: bottom + 16 }} keyboardShouldPersistTaps="handled">
         <View>
           <MapMock height={250} />
           {!find ? <Pressable accessibilityRole="button" accessibilityLabel="Choose route on full screen map" onPress={() => navigation.navigate('RoutePick')} style={StyleSheet.absoluteFill} /> : null}
@@ -124,7 +125,7 @@ export function Plan({ navigation }: any) {
           </View>
 
           {!find ? (
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: more }} accessibilityLabel="Other details" onPress={() => setMore(!more)} style={[st.row, { justifyContent: 'space-between', minHeight: 64 }]}>
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: more }} accessibilityLabel="Other details" onPress={() => { setMore(!more); if (!more) setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 120); }} style={[st.row, { justifyContent: 'space-between', minHeight: 64 }]}>
               <View style={[st.inline, { flex: 1 }]}>
                 <Icon name="tune-variant" size={24} color={colors.text} />
                 <View style={{ flex: 1 }}>

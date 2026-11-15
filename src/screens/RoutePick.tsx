@@ -71,10 +71,12 @@ export function RoutePick({ navigation }: any) {
       }),
     [pan],
   );
-  const pinY = size.h * 0.34;
+  const mini = mode === 'via' && !open;
+  const pinY = size.h * (mini ? 0.46 : 0.34);
   const confirmWaypoint = () => {
     if (via.length >= MAX_VIA) return;
     setVia([...via, { x: (size.w / 2 - panNow.current.x) / size.w, y: (pinY - panNow.current.y) / size.h }]);
+    setOpen(true);
   };
   const grid: number[] = [];
   for (let g = -4; g <= 6; g++) grid.push(g);
@@ -157,9 +159,17 @@ export function RoutePick({ navigation }: any) {
       {/* Sheet */}
       <View style={[s2.sheet, { paddingBottom: bottom + 14 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={open ? 'Hide details' : 'Show details'} onPress={() => setOpen(!open)} style={s2.grab}>
-          <View style={s2.grabBar} />
+          {mini ? (
+            <View style={s2.showChip}>
+              <Icon name="chevron-up" size={20} color={colors.text} />
+              <T v="label">Show details</T>
+            </View>
+          ) : (
+            <View style={s2.grabBar} />
+          )}
         </Pressable>
 
+        {mini ? null : (
         <View style={s2.summary}>
           <View style={{ flex: 1 }}>
             <T v="title" numberOfLines={1}>Via {ALTS[alt].name}</T>
@@ -170,6 +180,7 @@ export function RoutePick({ navigation }: any) {
             <T v="label">Reset</T>
           </Pressable>
         </View>
+        )}
 
         {open ? (
           <>
@@ -177,7 +188,7 @@ export function RoutePick({ navigation }: any) {
               {([['route', 'map-marker-path', 'Pick route'], ['via', 'map-marker-plus-outline', 'Add waypoint']] as const).map(([k, ic, label]) => {
                 const on = mode === k;
                 return (
-                  <Pressable key={k} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setMode(k)} style={[s2.mode, on && { backgroundColor: colors.ink }]}>
+                  <Pressable key={k} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => { setMode(k); setOpen(k === 'route'); }} style={[s2.mode, on && { backgroundColor: colors.ink }]}>
                     <Icon name={ic} size={20} color={on ? colors.accent : colors.text} />
                     <T v="label" color={on ? colors.accent : colors.text}>{label}</T>
                   </Pressable>
@@ -220,7 +231,7 @@ export function RoutePick({ navigation }: any) {
         {mode === 'via' ? (
           <>
             <Button title={via.length >= MAX_VIA ? `Maximum ${MAX_VIA} waypoints` : `Confirm waypoint ${via.length + 1} here`} variant="lime" disabled={via.length >= MAX_VIA} onPress={confirmWaypoint} />
-            <Button title="Use this route" variant="outline" onPress={done} />
+            {mini ? null : <Button title="Use this route" variant="outline" onPress={done} />}
           </>
         ) : (
           <Button title="Use this route" variant="lime" onPress={done} />
@@ -240,6 +251,7 @@ const s2 = makeStyles(() => ({
   wp: { position: 'absolute', width: 30, height: 30, borderRadius: 15, backgroundColor: colors.ink, borderWidth: 2, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center', elevation: 4 },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.ground, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: 16, gap: 10, elevation: 8 },
   grab: { alignItems: 'center', paddingTop: 8, paddingBottom: 2, minHeight: 24 },
+  showChip: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.white },
   grabBar: { width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line },
   summary: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   reset: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: colors.white },
