@@ -45,6 +45,7 @@ export function Plan({ navigation }: any) {
   const { top, bottom } = useSafeAreaInsets();
   const find = s.mode === 'find';
   const [timeOpen, setTimeOpen] = useState(false);
+  const [more, setMore] = useState(false);
   const [rate, setRate] = useState(5);
   const [auto, setAuto] = useState(true);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
@@ -122,6 +123,20 @@ export function Plan({ navigation }: any) {
             <Toggle value={s.recurring} onChange={v => set({ recurring: v })} />
           </View>
 
+          {!find ? (
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: more }} accessibilityLabel="Other details" onPress={() => setMore(!more)} style={[st.row, { justifyContent: 'space-between', minHeight: 64 }]}>
+              <View style={[st.inline, { flex: 1 }]}>
+                <Icon name="tune-variant" size={24} color={colors.text} />
+                <View style={{ flex: 1 }}>
+                  <T v="bodyStrong">Other details</T>
+                  <T v="small" color={colors.muted} numberOfLines={1}>{seats} seat{seats > 1 ? 's' : ''} · {active ? vehicleName(active) : 'No vehicle'} · {rate} pts/km</T>
+                </View>
+              </View>
+              <Icon name={more ? 'chevron-up' : 'chevron-down'} size={26} color={colors.text} />
+            </Pressable>
+          ) : null}
+
+          {find || more ? (
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={[st.row, { flex: 1, justifyContent: 'space-between', paddingHorizontal: 8 }]}>
               <Pressable accessibilityRole="button" accessibilityLabel="Fewer seats" onPress={() => set({ seats: Math.max(1, seats - 1) })} style={st.step}>
@@ -147,8 +162,9 @@ export function Plan({ navigation }: any) {
               </Pressable>
             )}
           </View>
+          ) : null}
 
-          {!find ? (
+          {!find && more ? (
             <View style={st.card}>
               <View style={st.optRow}>
                 <View style={{ flex: 1 }}>

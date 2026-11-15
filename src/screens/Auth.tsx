@@ -55,7 +55,7 @@ export function Onboarding({ navigation }: any) {
         <T v="small" color={colors.muted}>PROTOTYPE · walk through as</T>
         <Segmented value={auth.kind} options={[['new', 'New user'], ['verified', 'Verified user']]} onChange={signInAs} />
       </View>
-      <Button title="Enter your phone number" style={{ marginHorizontal: 24 }} onPress={() => navigation.navigate('Phone')} />
+      <Button title={auth.kind === 'verified' ? 'Continue' : 'Enter your phone number'} style={{ marginHorizontal: 24 }} onPress={() => (auth.kind === 'verified' ? navigation.reset({ index: 0, routes: [{ name: 'Home' }] }) : navigation.navigate('Phone'))} />
       <T v="small" color={colors.muted} style={s.terms}>By continuing, I agree to Go-Pool <T v="small" color={colors.blue} style={{ fontWeight: '700' }}>Terms</T></T>
     </SafeAreaView>
   );

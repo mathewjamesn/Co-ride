@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useRef, useState } from 'react';
+import { playTone } from './sound';
 
 export type Msg = { id: string; from: 'me' | 'them'; text: string; at: string };
 
@@ -30,6 +31,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     // Prototype: the other person answers after a moment.
     setTimeout(() => {
       push(id, { from: 'them', text: REPLIES[n.current % REPLIES.length] });
+      playTone('chat');
       if (opened.current !== id) setUnread(u => ({ ...u, [id]: (u[id] ?? 0) + 1 }));
     }, 1500);
   };

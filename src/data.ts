@@ -37,7 +37,6 @@ export const menuItems: { label: string; icon: string }[] = [
   { label: 'Referral & Rewards', icon: 'gift-outline' },
   { label: 'Favorites', icon: 'heart-outline' },
   { label: 'Vehicles', icon: 'car-outline' },
-  { label: 'Community', icon: 'account-multiple-outline' },
 ];
 
 export type Place = { name: string; addr: string };

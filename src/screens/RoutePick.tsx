@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { Animated, PanResponder, Pressable, ScrollView, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, T } from '../components';
@@ -46,12 +46,42 @@ export function RoutePick({ navigation }: any) {
   const [open, setOpen] = useState(true);
   const [size, setSize] = useState({ w: 360, h: 640 });
 
+  // Waypoint mode: the map scrolls under a fixed pointer; Confirm drops the waypoint where the pointer is.
+  const pan = useRef(new Animated.ValueXY()).current;
+  const panNow = useRef({ x: 0, y: 0 });
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) => modeRef.current === 'via' && (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4),
+        onPanResponderGrant: () => {
+          pan.setOffset(panNow.current);
+          pan.setValue({ x: 0, y: 0 });
+        },
+        onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+        onPanResponderRelease: (_, g) => {
+          panNow.current = { x: panNow.current.x + g.dx, y: panNow.current.y + g.dy };
+          pan.flattenOffset();
+        },
+        onPanResponderTerminate: (_, g) => {
+          panNow.current = { x: panNow.current.x + g.dx, y: panNow.current.y + g.dy };
+          pan.flattenOffset();
+        },
+      }),
+    [pan],
+  );
+  const pinY = size.h * 0.34;
+  const confirmWaypoint = () => {
+    if (via.length >= MAX_VIA) return;
+    setVia([...via, { x: (size.w / 2 - panNow.current.x) / size.w, y: (pinY - panNow.current.y) / size.h }]);
+  };
+  const grid: number[] = [];
+  for (let g = -4; g <= 6; g++) grid.push(g);
+
   const tap = (e: any) => {
     const p = { x: e.nativeEvent.locationX / size.w, y: e.nativeEvent.locationY / size.h };
-    if (mode === 'via') {
-      if (via.length < MAX_VIA) setVia([...via, p]);
-      return;
-    }
+    if (mode === 'via') return;
     const n = nearestAlt(p, via);
     if (n.dist < 40) setAlt(n.alt);
   };
@@ -66,7 +96,15 @@ export function RoutePick({ navigation }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.mapBg }} onLayout={e => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
       {/* Map */}
-      <Pressable accessibilityLabel={mode === 'via' ? 'Map: tap to add a waypoint' : 'Map: tap a route to choose it'} onPress={tap} style={{ flex: 1 }}>
+      <View style={{ flex: 1, overflow: 'hidden' }} {...responder.panHandlers}>
+      <Animated.View style={{ width: size.w, height: size.h, transform: pan.getTranslateTransform() }}>
+      {grid.map(g => (
+        <React.Fragment key={g}>
+          <View pointerEvents="none" style={{ position: 'absolute', left: g * 90, top: -size.h * 2, width: 2, height: size.h * 5, backgroundColor: colors.line, opacity: 0.35 }} />
+          <View pointerEvents="none" style={{ position: 'absolute', top: g * 110, left: -size.w * 2, height: 2, width: size.w * 5, backgroundColor: colors.line, opacity: 0.35 }} />
+        </React.Fragment>
+      ))}
+      <Pressable accessibilityLabel="Map: tap a route to choose it" onPress={tap} style={{ width: size.w, height: size.h }}>
         <View pointerEvents="none" style={{ position: 'absolute', left: -50, bottom: -30, width: 220, height: size.h * 0.6, backgroundColor: colors.mapWater, borderRadius: 110 }} />
         <View pointerEvents="none" style={{ position: 'absolute', right: 20, top: size.h * 0.2, width: 120, height: 80, backgroundColor: colors.mapPark, borderRadius: 34 }} />
 
@@ -97,6 +135,14 @@ export function RoutePick({ navigation }: any) {
           </Pressable>
         ))}
       </Pressable>
+      </Animated.View>
+      </View>
+      {mode === 'via' ? (
+        <View pointerEvents="none" style={{ position: 'absolute', left: size.w / 2 - 22, top: pinY - 44, alignItems: 'center' }}>
+          <Icon name="map-marker" size={44} color={colors.blue} />
+          <View style={s2.pinShadow} />
+        </View>
+      ) : null}
 
       {/* Top bar */}
       <View style={[s2.topRow, { top: top + 12 }]} pointerEvents="box-none">
@@ -104,7 +150,7 @@ export function RoutePick({ navigation }: any) {
           <Icon name="arrow-left" size={22} color={colors.text} />
         </Pressable>
         <View style={s2.titleChip}>
-          <T v="label" numberOfLines={1}>{mode === 'via' ? 'Tap the map to add a waypoint' : 'Tap a route to choose it'}</T>
+          <T v="label" numberOfLines={1}>{mode === 'via' ? 'Drag the map to place the pointer' : 'Tap a route to choose it'}</T>
         </View>
       </View>
 
@@ -155,7 +201,7 @@ export function RoutePick({ navigation }: any) {
 
             <View style={{ gap: 6 }}>
               {via.length === 0 ? (
-                <T v="small" color={colors.muted}>No waypoints. Switch to “Add waypoint” and tap the map to route through a place, up to {MAX_VIA}.</T>
+                <T v="small" color={colors.muted}>No waypoints. Switch to “Add waypoint”, drag the map to put the pointer on a place and confirm. Up to {MAX_VIA}.</T>
               ) : (
                 via.map((p, i) => (
                   <View key={i} style={s2.viaRow}>
@@ -171,7 +217,14 @@ export function RoutePick({ navigation }: any) {
           </>
         ) : null}
 
-        <Button title="Use this route" variant="lime" onPress={done} />
+        {mode === 'via' ? (
+          <>
+            <Button title={via.length >= MAX_VIA ? `Maximum ${MAX_VIA} waypoints` : `Confirm waypoint ${via.length + 1} here`} variant="lime" disabled={via.length >= MAX_VIA} onPress={confirmWaypoint} />
+            <Button title="Use this route" variant="outline" onPress={done} />
+          </>
+        ) : (
+          <Button title="Use this route" variant="lime" onPress={done} />
+        )}
       </View>
     </View>
   );
@@ -182,6 +235,7 @@ const s2 = makeStyles(() => ({
   round: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', elevation: 3 },
   titleChip: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', paddingHorizontal: 14, elevation: 3 },
   pill: { position: 'absolute', width: 68, minHeight: 32, borderRadius: radius.pill, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', elevation: 3 },
+  pinShadow: { width: 14, height: 5, borderRadius: 7, backgroundColor: 'rgba(0,0,0,0.35)', marginTop: -4 },
   dot: { position: 'absolute', width: 20, height: 20, borderRadius: 10, borderWidth: 3, borderColor: colors.text },
   wp: { position: 'absolute', width: 30, height: 30, borderRadius: 15, backgroundColor: colors.ink, borderWidth: 2, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center', elevation: 4 },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.ground, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: 16, gap: 10, elevation: 8 },

@@ -1,5 +1,6 @@
+import { playTone } from '../sound';
 import React, { useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Button, T } from '../components';
@@ -24,6 +25,7 @@ export function Status({ navigation, route }: any) {
   const accept = () => {
     if (find) beginAsRider(person, s.from);
     else beginAsDriver(person, active?.seats ?? 1);
+    playTone('accepted');
     navigation.replace('Accepted');
   };
   const fg = cancelled ? colors.onInk : colors.accent;
@@ -72,10 +74,6 @@ export function Status({ navigation, route }: any) {
           </View>
         )}
         <View style={st.refer}>
-          <T v="title" style={{ textAlign: 'center' }}>To get more matches, refer your friends & colleagues</T>
-          <View style={st.referIcon}><Icon name="account-multiple-plus" size={56} color={colors.text} /></View>
-          <T color={colors.muted} style={{ marginBottom: 12, textAlign: 'center' }}>Earn 500 points plus 2% commission on every ride</T>
-          <Button title="Refer now" variant="lime" style={{ alignSelf: 'stretch' }} onPress={() => Linking.openURL('https://wa.me/?text=Join%20me%20on%20Go-Pool')} />
           {!cancelled && <Button title="Cancel ride" variant="danger" style={{ alignSelf: 'stretch', marginTop: 12 }} onPress={() => navigation.navigate('CancelRide', { role: find ? 'rider' : 'driver', from: s.from, to: s.to, when: s.when, people: person.name, personId: person.id })} />}
           {cancelled && <Button title="Back to home" variant="outline" style={{ alignSelf: 'stretch', marginTop: 12 }} onPress={() => navigation.popToTop()} />}
         </View>
