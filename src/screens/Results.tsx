@@ -2,16 +2,17 @@ import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Button, CompactCard, Header, MapMock, PersonCard, Segmented, T, Toggle } from '../components';
+import { Avatar, BottomNav, Button, CompactCard, Header, MapMock, PersonCard, Segmented, T, Toggle } from '../components';
 import { colors, radius, makeStyles } from '../theme';
 import { Person, rideGivers, rideTakers } from '../data';
 import { useSearch } from '../state';
 import { useKeepAwake } from '../keepAwake';
 import { callNumber } from './Chat';
 
-export type Sort = 'recommended' | 'route' | 'points' | 'active' | 'pickup';
+export type Sort = 'recommended' | 'soon' | 'route' | 'points' | 'active' | 'pickup';
 const sortLabels: [Sort, string][] = [
   ['recommended', 'Recommended'],
+  ['soon', 'Leaving soonest'],
   ['route', 'Route % - High to Low'],
   ['points', 'Points - Low to High'],
   ['active', 'Active Users - High to Low'],
@@ -19,8 +20,15 @@ const sortLabels: [Sort, string][] = [
 ];
 const km = (t: string) => (t.endsWith('km') ? parseFloat(t) * 1000 : parseFloat(t));
 
+const mins = (t: string) => {
+  const m = /(\d{1,2}):(\d{2})\s*(am|pm)/i.exec(t);
+  if (!m) return 0;
+  return ((parseInt(m[1], 10) % 12) + (m[3].toLowerCase() === 'pm' ? 12 : 0)) * 60 + parseInt(m[2], 10);
+};
+
 function sortList(list: Person[], by: Sort) {
   const l = [...list];
+  if (by === 'soon') l.sort((a, b) => mins(a.time) - mins(b.time));
   if (by === 'route') l.sort((a, b) => b.match - a.match);
   if (by === 'points') l.sort((a, b) => a.points - b.points);
   if (by === 'active') l.sort((a, b) => b.reviews - a.reviews);
@@ -80,59 +88,97 @@ export function Results({ navigation, route }: any) {
   const data = useMemo(() => sortList(base.filter(p => !verifiedOnly || p.verified), sort), [base, sort, verifiedOnly]);
   const noun = find ? 'ride givers' : 'ride takers';
 
+  const { top } = useSafeAreaInsets();
+  const chips: { key: string; label: string; on: boolean; press: () => void }[] = [
+    { key: 'rec', label: 'Best match', on: sort === 'recommended', press: () => setSort('recommended') },
+    { key: 'soon', label: 'Leaving soon', on: sort === 'soon', press: () => setSort('soon') },
+    { key: 'cheap', label: 'Cheapest', on: sort === 'points', press: () => setSort('points') },
+    { key: 'walk', label: 'Shortest walk', on: sort === 'pickup', press: () => setSort('pickup') },
+    { key: 'ver', label: 'Verified', on: verifiedOnly, press: () => setVerifiedOnly(!verifiedOnly) },
+  ];
+  const lastReq = [...s.requested].reverse().map(id => base.find(p => p.id === id)).find(Boolean);
+
+  const card = (item: Person, index: number) => {
+    const sent = s.requested.includes(item.id);
+    const cta = sent ? (find ? 'Requested' : 'Offered') : find ? 'Request' : 'Offer';
+    const onCta = () => (sent ? navigation.navigate('Status', { person: item, find }) : set({ requested: [...s.requested, item.id] }));
+    const onPress = () => navigation.navigate('Route', { list: data, index });
+    return view === 'compact' ? (
+      <CompactCard p={item} cta={cta} done={sent} onCta={onCta} onPress={onPress} />
+    ) : (
+      <PersonCard p={item} cta={cta} done={sent} onCta={onCta} onPress={onPress} onChat={() => navigation.navigate('Chat', { id: item.id, name: item.name, sub: item.org })} onCall={callNumber} />
+    );
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
-      <Header
-        title={`${data.length} ${noun} available`}
-        subtitle={s.when}
-        onBack={() => navigation.goBack()}
-        rightIcon="filter-variant"
-        onRight={() => navigation.navigate('Filter', { sort, verifiedOnly, noun, onApply: (a: Sort, b: boolean) => { setSort(a); setVerifiedOnly(b); } })}
-      />
+      <View style={[st.listTop, { paddingTop: top + 8 }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close search and go home" onPress={() => navigation.navigate('Home')} style={st.topBtn}>
+          <Icon name="close" size={22} color={colors.text} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Edit search" onPress={() => navigation.navigate('Plan')} style={st.pill}>
+          <View style={{ flex: 1 }}>
+            <T v="bodyStrong" numberOfLines={1}>{s.from} → {s.to}</T>
+            <T v="small" color={colors.muted} numberOfLines={1}>{s.when} · {s.seats} seat{s.seats > 1 ? 's' : ''}</T>
+          </View>
+          <Icon name="pencil-outline" size={20} color={colors.text} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="More filters" onPress={() => navigation.navigate('Filter', { sort, verifiedOnly, noun, onApply: (a: Sort, b: boolean) => { setSort(a); setVerifiedOnly(b); } })} style={st.topBtn}>
+          <Icon name="filter-variant" size={22} color={colors.text} />
+        </Pressable>
+      </View>
       <FlatList
         data={data}
         keyExtractor={p => p.id}
         contentContainerStyle={{ padding: 16 }}
-        extraData={view}
+        extraData={[view, s.requested]}
         ListHeaderComponent={
-          <View>
-            <View style={{ marginBottom: 12 }}>
-              <Segmented value={view} options={[['detailed', 'Detailed'], ['compact', 'Compact']]} onChange={setView} />
-            </View>
-            <View style={st.summary}>
-              <Icon name="map-marker-path" size={22} color={colors.text} />
-              <T style={{ flex: 1, marginLeft: 8 }} numberOfLines={1}>{s.from} → {s.to}</T>
-              <T v="label" color={colors.muted}>11 KM</T>
+          <View style={{ gap: 12, marginBottom: 12 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {chips.map(c => (
+                <Pressable key={c.key} accessibilityRole="button" accessibilityState={{ selected: c.on }} onPress={c.press} style={[st.chip, c.on && { backgroundColor: colors.ink, borderColor: colors.ink }]}>
+                  <T v="label" color={c.on ? colors.accent : colors.text}>{c.label}</T>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <View style={st.countRow}>
+              <T v="bodyStrong" style={{ flex: 1 }}>{data.length} {noun} available</T>
+              <View style={{ width: 190 }}>
+                <Segmented value={view} options={[['detailed', 'Detailed'], ['compact', 'Compact']]} onChange={setView} />
+              </View>
             </View>
           </View>
         }
         ListEmptyComponent={
           <View style={[st.summary, { flexDirection: 'column', alignItems: 'stretch', gap: 12 }]}>
             <T v="heading">No {noun} match these filters</T>
-            <T v="small" color={colors.muted}>Try turning off the verification filter.</T>
-            <Button title="Reset filters" onPress={() => setVerifiedOnly(false)} />
+            <T v="small" color={colors.muted}>Try turning off the verification filter or change the time.</T>
+            <Button title="Reset filters" onPress={() => { setVerifiedOnly(false); setSort('recommended'); }} />
+            <Button title="Change time or place" variant="outline" onPress={() => navigation.navigate('Plan')} />
           </View>
         }
-        renderItem={({ item, index }) => view === 'compact' ? (
-          <CompactCard
-            p={item}
-            cta={s.requested.includes(item.id) ? (find ? 'Requested' : 'Offered') : find ? 'Request' : 'Offer'}
-            done={s.requested.includes(item.id)}
-            onCta={() => (s.requested.includes(item.id) ? navigation.navigate('Status', { person: item, find }) : set({ requested: [...s.requested, item.id] }))}
-            onPress={() => navigation.navigate('Route', { list: data, index })}
-          />
-        ) : (
-          <PersonCard
-            p={item}
-            cta={s.requested.includes(item.id) ? (find ? 'Requested' : 'Offered') : find ? 'Request' : 'Offer'}
-            done={s.requested.includes(item.id)}
-            onCta={() => (s.requested.includes(item.id) ? navigation.navigate('Status', { person: item, find }) : set({ requested: [...s.requested, item.id] }))}
-            onPress={() => navigation.navigate('Route', { list: data, index })}
-            onChat={() => navigation.navigate('Chat', { id: item.id, name: item.name, sub: item.org })}
-            onCall={callNumber}
-          />
-        )}
+        renderItem={({ item, index }) =>
+          index === 0 && sort === 'recommended' ? (
+            <View style={st.hero}>
+              <View style={st.heroTag}>
+                <Icon name="star-circle" size={18} color={colors.accent} />
+                <T v="label" color={colors.onInk} style={{ flex: 1 }} numberOfLines={1}>Best match · walk {item.walkTo} · {item.time} · {item.match}%</T>
+              </View>
+              {card(item, index)}
+            </View>
+          ) : (
+            card(item, index)
+          )
+        }
       />
+      {s.requested.length ? (
+        <Pressable accessibilityRole="button" onPress={() => lastReq && navigation.navigate('Status', { person: lastReq, find })} style={st.strip}>
+          <Icon name="send-check" size={20} color={colors.accent} />
+          <T v="label" color={colors.onInk} style={{ flex: 1 }}>{s.requested.length} {find ? 'request' : 'offer'}{s.requested.length > 1 ? 's' : ''} sent</T>
+          <T v="label" color={colors.accent}>View</T>
+        </Pressable>
+      ) : null}
+      <BottomNav active={null} navigation={navigation} />
     </View>
   );
 }
@@ -304,6 +350,14 @@ export function Filter({ navigation, route }: any) {
 }
 
 const st = makeStyles(() => ({
+  listTop: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 10, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line },
+  topBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' },
+  pill: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.ground, borderRadius: radius.pill, paddingHorizontal: 16 },
+  chip: { minHeight: 40, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  countRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  hero: { borderRadius: radius.lg + 4, borderWidth: 2, borderColor: colors.ink, overflow: 'hidden', marginBottom: 12 },
+  heroTag: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.ink, paddingHorizontal: 14, minHeight: 40 },
+  strip: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.ink, marginHorizontal: 16, marginBottom: 8, borderRadius: radius.pill, paddingHorizontal: 18, minHeight: 48 },
   stepDot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   stepLine: { width: 2, flex: 1, backgroundColor: colors.line, marginVertical: 2 },
   pager: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: colors.white, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, height: 44 },

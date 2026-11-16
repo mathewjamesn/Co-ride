@@ -157,12 +157,12 @@ const TABS: { key: NavTab; label: string; icon: string; on: string; route: strin
 ];
 
 /** Bottom menu: Home, Booking, Wallet, Profile. */
-export const BottomNav = ({ active, navigation }: { active: NavTab; navigation: any }) => {
+export const BottomNav = ({ active, navigation }: { active: NavTab | null; navigation: any }) => {
   const { bottom } = useSafeAreaInsets();
   const go = (tab: (typeof TABS)[number]) => {
     if (tab.key === active) return;
     if (tab.key === 'Home') navigation.navigate('Home');
-    else if (active === 'Home') navigation.navigate(tab.route);
+    else if (active === 'Home' || active === null) navigation.navigate(tab.route);
     else navigation.replace(tab.route);
   };
   return (

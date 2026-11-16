@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Go-Pool on Azure ��� Implementation Plan v3</title>
+  
+  <style>
+  :root{--bg:#f6f7f4;--card:#fff;--text:#14171a;--muted:#5d666e;--line:#dfe3e0;--code:#eef1ee;--accent:#2e6b00;--lime:#c6f432}
+  @media (prefers-color-scheme:dark){:root{--bg:#0f1214;--card:#181c1f;--text:#eceff1;--muted:#98a2aa;--line:#2b3237;--code:#20262a;--accent:#c6f432}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 16px 80px}
+  h1{font-size:clamp(28px,5vw,38px);line-height:1.15;margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 20px}
+  h2{font-size:24px;margin:48px 0 10px;padding-top:12px;border-top:4px solid var(--lime)}
+  h3{font-size:18px;margin:26px 0 6px}
+  a{color:var(--accent)}
+  #TOC{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 18px;margin:20px 0}
+  #TOC ul{columns:2;margin:4px 0;padding-left:18px}#TOC ul ul{display:none}
+  @media(max-width:640px){#TOC ul{columns:1}}
+  table{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--card);border:1px solid var(--line);display:block;overflow-x:auto;margin:10px 0}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--code);font-size:13px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:13px;background:var(--code);padding:1px 5px;border-radius:5px}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px;overflow-x:auto;line-height:1.45}
+  pre code{background:none;padding:0}
+  ul.task-list{list-style:none;padding-left:4px}
+  li{margin:3px 0}
+  </style>
+</head>
+<body><div class="wrap">
+<header id="title-block-header">
+<h1 class="title">Go-Pool on Azure ��� Implementation Plan v3</h1><p class="sub">Single source of truth for building Go-Pool. Supersedes plan.html v2 and the QuickRide Matching Engine Design 1.0 document. Updated 16 November 2026 (live location moved to its own Cosmos account).</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#1-decisions-at-a-glance"
+id="toc-1-decisions-at-a-glance">1. Decisions at a glance</a></li>
+<li><a href="#2-architecture" id="toc-2-architecture">2.
+Architecture</a></li>
+<li><a href="#3-hosting-and-solution-layout"
+id="toc-3-hosting-and-solution-layout">3. Hosting and solution
+layout</a></li>
+<li><a href="#4-config-table" id="toc-4-config-table">4. Config
+table</a></li>
+<li><a href="#5-login-jwt-and-blocking"
+id="toc-5-login-jwt-and-blocking">5. Login, JWT and blocking</a></li>
+<li><a href="#6-cosmos-db-the-rides-container"
+id="toc-6-cosmos-db-the-rides-container">6. Cosmos DB: the
+<code>rides</code> container</a></li>
+<li><a href="#6a-live-location">6A. Live location</a></li>
+<li><a href="#7-table-storage" id="toc-7-table-storage">7. Table
+Storage</a></li>
+<li><a href="#8-matching-engine-full-specification"
+id="toc-8-matching-engine-full-specification">8. Matching engine (full
+specification)</a></li>
+<li><a href="#9-maps-places-and-routes"
+id="toc-9-maps-places-and-routes">9. Maps, places and routes</a></li>
+<li><a href="#10-trips-chat-and-notifications"
+id="toc-10-trips-chat-and-notifications">10. Trips, chat and
+notifications</a></li>
+<li><a href="#11-wallet-and-payments-phonepe-pg-v2"
+id="toc-11-wallet-and-payments-phonepe-pg-v2">11. Wallet and payments
+(PhonePe PG v2)</a></li>
+<li><a href="#12-admin-app" id="toc-12-admin-app">12. Admin app</a></li>
+<li><a href="#13-environments-and-deployment"
+id="toc-13-environments-and-deployment">13. Environments and
+deployment</a></li>
+<li><a href="#14-api-surface" id="toc-14-api-surface">14. API
+surface</a></li>
+<li><a href="#15-changes-to-the-react-native-prototype"
+id="toc-15-changes-to-the-react-native-prototype">15. Changes to the
+React Native prototype</a></li>
+<li><a href="#16-delivery-phases" id="toc-16-delivery-phases">16.
+Delivery phases</a></li>
+<li><a href="#17-risks" id="toc-17-risks">17. Risks</a></li>
+<li><a href="#18-open-questions-for-the-product-owner"
+id="toc-18-open-questions-for-the-product-owner">18. Open questions for
+the product owner</a></li>
+</ul>
+</nav>
+<p>This document is the single source of truth for building Go-Pool. It
+replaces plan.html v2 and the QuickRide Matching Engine Design 1.0 Word
+document: everything from those that is still needed is included here,
+with the corrections agreed in review. A developer needs only this
+document and the existing React Native prototype code.</p>
+<p>Nothing here is built yet. Prices, free grants, runtime support dates
+and third-party API terms change; verify the items marked
+<strong>Verify</strong> before committing.</p>
+<h2 id="1-decisions-at-a-glance">1. Decisions at a glance</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Area</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Compute</td>
+<td>C# .NET isolated worker (.NET 10 LTS), Azure Functions Consumption
+plan (Windows), ReadyToRun publish</td>
+</tr>
+<tr class="even">
+<td>Function Apps</td>
+<td>Two: <code>gopool-api</code> (public app) and
+<code>gopool-admin</code> (Admin app). Both reference one class library
+<code>GoPool.Core</code></td>
+</tr>
+<tr class="odd">
+<td>Warm-up</td>
+<td>Existing "Wake Me Up" timer every 8 minutes, doing real
+initialisation work (see 3.2)</td>
+</tr>
+<tr class="even">
+<td>Rides data</td>
+<td>Cosmos DB serverless account (geospatial, bursty), <strong>one container
+<code>rides</code></strong> holding offers, requests and holds, plus a places container for points of interest. Live driver location lives in a separate free-tier provisioned account (section 6A)</td>
+</tr>
+<tr class="odd">
+<td>Everything else</td>
+<td>Azure Table Storage (users, config, vehicles, bookings, trips, chat,
+wallet, payments, audit)</td>
+</tr>
+<tr class="even">
+<td>Files</td>
+<td>Blob Storage, private containers (ID photos, vehicle documents)</td>
+</tr>
+<tr class="odd">
+<td>Secrets</td>
+<td>Key Vault via app-setting references; managed identity wherever
+supported. Locally, <code>local.settings.json</code> (never
+committed)</td>
+</tr>
+<tr class="even">
+<td>Auth</td>
+<td>SMS OTP login, signed JWT valid 1 year, with user
+<code>status</code> and <code>tokenVersion</code> checked on every
+call</td>
+</tr>
+<tr class="odd">
+<td>Matching</td>
+<td>Cosmos spatial filter for the rough cut, C# (NetTopologySuite) for
+precise snapping and scoring. Section 8 is the full specification</td>
+</tr>
+<tr class="even">
+<td>Routing</td>
+<td>Google Routes API for route choice and display; self-hosted OSRM
+(Azure Container Apps, key-protected) for walking distance and route
+timings; Haversine fallback</td>
+</tr>
+<tr class="odd">
+<td>Places</td>
+<td>Ola autocomplete and reverse geocode via an API proxy, Google as
+fallback</td>
+</tr>
+<tr class="even">
+<td>Push</td>
+<td>FCM HTTP v1 for all notifications and data messages; live driver position written and read directly in Cosmos with resource tokens (section 6A)</td>
+</tr>
+<tr class="odd">
+<td>Payments</td>
+<td>PhonePe PG v2 wallet top-up; queue-driven, idempotent ride
+settlement; fare reserved at booking</td>
+</tr>
+<tr class="even">
+<td>Environments</td>
+<td>Separate staging and production subscriptions, each with a free-tier provisioned Cosmos account (live location) and a serverless Cosmos account (rides, places). No Cosmos emulator</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-architecture">2. Architecture</h2>
+<p>Clients:</p>
+<ul>
+<li><strong>Go-Pool app</strong> — React Native CLI (no Expo), Android
+first. Existing prototype.</li>
+<li><strong>Go-Pool Admin</strong> — separate client (recommended: React
+web app on Azure Static Web Apps).</li>
+</ul>
+<p>Server:</p>
+<ul>
+<li><strong>gopool-api</strong> — JWT middleware, auth, profile,
+vehicles, places proxy, routes, offers, requests, matching engine,
+joins, trips, chat, wallet, PhonePe webhook, config. Timers: warm-up,
+expiry clean-up, recurring-offer materialisation, payment re-check.
+Queue triggers: notifications, settlement.</li>
+<li><strong>gopool-admin</strong> — own login and roles, verification
+queue, user block/unblock, Config editor, ride and dispute view, wallet
+adjustments, audit log.</li>
+</ul>
+<p>Data stores: Table Storage, Blob Storage, Cosmos DB
+(<code>rides</code>), Key Vault, Storage Queues.</p>
+<p>External services: Google (Routes API, Maps SDK for Android), Ola
+Maps, OSRM on Azure Container Apps, Firebase Cloud Messaging, SMS and
+email OTP provider, PhonePe PG v2.</p>
+<h2 id="3-hosting-and-solution-layout">3. Hosting and solution
+layout</h2>
+<h3 id="31-runtime-and-plan">3.1 Runtime and plan</h3>
+<ul>
+<li>.NET isolated worker model on <strong>.NET 10</strong>. Do not start
+on .NET 8 (support ends November 2026). <strong>Verify</strong> .NET 10
+is offered on Consumption in the chosen region.</li>
+<li><strong>Windows</strong> Consumption plan. Microsoft has announced
+retirement of Linux Consumption; <strong>verify</strong> the current
+announcement before creating resources.</li>
+<li>Publish with ReadyToRun. Register singletons once at start-up:
+<code>CosmosClient</code>, <code>TableServiceClient</code>,
+<code>BlobServiceClient</code>, <code>IHttpClientFactory</code>,
+Firebase app, OSRM client, config cache.</li>
+<li>System-assigned managed identity for Cosmos (data-plane RBAC),
+Tables, Blobs and Queues. Third-party secrets through Key Vault
+references.</li>
+<li>Timeouts: default 5 minutes. Nothing on the request path should
+exceed a few seconds; slow work goes to queues.</li>
+</ul>
+<h3 id="32-warm-up-timer">3.2 Warm-up timer</h3>
+<p>The existing "Wake Me Up" timer runs every 8 minutes in each Function
+App. It must do real work, not just return:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode csharp"><code class="sourceCode cs"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="op">[</span><span class="fu">Function</span><span class="op">(</span><span class="st">&quot;WakeMeUp&quot;</span><span class="op">)]</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span> async Task <span class="fu">Run</span><span class="op">([</span><span class="fu">TimerTrigger</span><span class="op">(</span><span class="st">&quot;0 */8 * * * *&quot;</span><span class="op">)]</span> TimerInfo t<span class="op">)</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="op">{</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    await _config<span class="op">.</span><span class="fu">RefreshAsync</span><span class="op">();</span>   <span class="co">// reload Config table into memory</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    await _cosmos<span class="op">.</span><span class="fu">WarmAsync</span><span class="op">();</span>      <span class="co">// open connections</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    await _tables<span class="op">.</span><span class="fu">PingAsync</span><span class="op">();</span>      <span class="co">// touch Users and Config tables</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    await _jwt<span class="op">.</span><span class="fu">PrimeKeysAsync</span><span class="op">();</span>    <span class="co">// load signing keys</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>It keeps one instance warm. A burst of traffic that makes Azure add
+instances will still cold-start those. If that becomes a problem, move
+to Flex Consumption with always-ready instances (a plan change, not a
+code change).</p>
+<h3 id="33-osrm-access">3.3 OSRM access</h3>
+<p>OSRM runs on Azure Container Apps with public ingress protected by a
+key. The key lives in Key Vault and is sent as a header by a typed
+<code>OsrmClient</code> (HttpClient factory). Every OSRM call has a 1.5
+second timeout and a circuit breaker (Polly); on failure the engine uses
+the Haversine fallback described in section 8. Keep minimum replicas at
+1. <strong>Verify</strong> that both the <code>car</code> and
+<code>foot</code> profiles are built; the foot profile is needed for
+walking distance.</p>
+<h3 id="34-solution-layout">3.4 Solution layout</h3>
+<pre class="text"><code>GoPool.sln
+  GoPool.Core     domain models, repositories (Table, Cosmos), Matching, Geo, Providers (Google, Ola, OSRM), Config, Jwt, Fcm, PhonePe, Wallet
+  GoPool.Api      public Function App (HTTP, timers, queues)
+  GoPool.Admin    admin Function App
+  GoPool.Tests    unit tests (matching maths, state machine, JWT, wallet idempotency)
+  infra/          Bicep, one parameter file per subscription
+app/              existing React Native prototype
+admin-web/        Admin client</code></pre>
+<p>Main packages: <code>Microsoft.Azure.Functions.Worker</code>,
+<code>Microsoft.Azure.Cosmos</code>, <code>Azure.Data.Tables</code>,
+<code>Azure.Storage.Blobs</code>, <code>Azure.Storage.Queues</code>,
+<code>Azure.Identity</code>, <code>NetTopologySuite</code>,
+<code>ProjNet</code>, <code>FirebaseAdmin</code>,
+<code>Microsoft.IdentityModel.JsonWebTokens</code>,
+<code>FluentValidation</code>, <code>Polly</code>. Use
+<code>System.Text.Json</code> everywhere (no Newtonsoft). Use
+<code>DateTimeOffset</code> with the IST offset for all times.</p>
+<h2 id="4-config-table">4. Config table</h2>
+<p>Table <code>Config</code>, two rows per environment, each holding one
+JSON document in property <code>Json</code>.</p>
+<table>
+<thead>
+<tr class="header">
+<th>PartitionKey</th>
+<th>RowKey</th>
+<th>Read by</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>mobile</code></td>
+<td><code>current</code></td>
+<td>The app via <code>GET /config</code> (open endpoint, returns only
+this row)</td>
+</tr>
+<tr class="even">
+<td><code>api</code></td>
+<td><code>current</code></td>
+<td>The API only; never sent to a client</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="er">//</span> <span class="er">mobile</span> <span class="er">/</span> <span class="er">current</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;minAppVersion&quot;</span><span class="fu">:</span> <span class="st">&quot;1.0.0&quot;</span><span class="fu">,</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;autocomplete&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;debounceMs&quot;</span><span class="fu">:</span> <span class="dv">300</span><span class="fu">,</span> <span class="dt">&quot;minChars&quot;</span><span class="fu">:</span> <span class="dv">3</span><span class="fu">,</span> <span class="dt">&quot;maxResults&quot;</span><span class="fu">:</span> <span class="dv">6</span> <span class="fu">},</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;polling&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;liveLocationSec&quot;</span><span class="fu">:</span> <span class="dv">8</span><span class="fu">,</span> <span class="dt">&quot;tripStateSec&quot;</span><span class="fu">:</span> <span class="dv">15</span> <span class="fu">},</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;limits&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;maxWaypoints&quot;</span><span class="fu">:</span> <span class="dv">5</span><span class="fu">,</span> <span class="dt">&quot;maxSeats&quot;</span><span class="fu">:</span> <span class="dv">4</span> <span class="fu">},</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;features&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;chat&quot;</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span> <span class="dt">&quot;wallet&quot;</span><span class="fu">:</span> <span class="kw">true</span><span class="fu">,</span> <span class="dt">&quot;endorsements&quot;</span><span class="fu">:</span> <span class="kw">true</span> <span class="fu">},</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;support&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;phone&quot;</span><span class="fu">:</span> <span class="st">&quot;+91...&quot;</span><span class="fu">,</span> <span class="dt">&quot;email&quot;</span><span class="fu">:</span> <span class="st">&quot;help@...&quot;</span> <span class="fu">}</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="er">//</span> <span class="er">api</span> <span class="er">/</span> <span class="er">current</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;version&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;jwt&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;lifetimeDays&quot;</span><span class="fu">:</span> <span class="dv">365</span><span class="fu">,</span> <span class="dt">&quot;userCacheSec&quot;</span><span class="fu">:</span> <span class="dv">60</span> <span class="fu">},</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;matching&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;candidateRadiusM&quot;</span><span class="fu">:</span> <span class="dv">2000</span><span class="fu">,</span> <span class="dt">&quot;maxCandidates&quot;</span><span class="fu">:</span> <span class="dv">100</span><span class="fu">,</span> <span class="dt">&quot;keepTopN&quot;</span><span class="fu">:</span> <span class="dv">20</span><span class="fu">,</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;looseBearingDeg&quot;</span><span class="fu">:</span> <span class="dv">90</span><span class="fu">,</span> <span class="dt">&quot;segmentBearingDeg&quot;</span><span class="fu">:</span> <span class="dv">45</span><span class="fu">,</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;maxWalkM&quot;</span><span class="fu">:</span> <span class="dv">1500</span><span class="fu">,</span> <span class="dt">&quot;maxWaitMin&quot;</span><span class="fu">:</span> <span class="dv">20</span><span class="fu">,</span> <span class="dt">&quot;minCoverage&quot;</span><span class="fu">:</span> <span class="fl">0.6</span><span class="fu">,</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;weights&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;walk&quot;</span><span class="fu">:</span> <span class="fl">0.30</span><span class="fu">,</span> <span class="dt">&quot;wait&quot;</span><span class="fu">:</span> <span class="fl">0.20</span><span class="fu">,</span> <span class="dt">&quot;fare&quot;</span><span class="fu">:</span> <span class="fl">0.15</span><span class="fu">,</span> <span class="dt">&quot;bearing&quot;</span><span class="fu">:</span> <span class="fl">0.15</span><span class="fu">,</span> <span class="dt">&quot;coverage&quot;</span><span class="fu">:</span> <span class="fl">0.20</span> <span class="fu">},</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;referenceRatePerKm&quot;</span><span class="fu">:</span> <span class="fl">4.5</span><span class="fu">,</span> <span class="dt">&quot;holdSeconds&quot;</span><span class="fu">:</span> <span class="dv">75</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;routing&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;osrmTimeoutMs&quot;</span><span class="fu">:</span> <span class="dv">1500</span><span class="fu">,</span> <span class="dt">&quot;walkSpeedMps&quot;</span><span class="fu">:</span> <span class="fl">1.3</span> <span class="fu">},</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;places&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;provider&quot;</span><span class="fu">:</span> <span class="st">&quot;ola&quot;</span><span class="fu">,</span> <span class="dt">&quot;fallback&quot;</span><span class="fu">:</span> <span class="st">&quot;google&quot;</span><span class="fu">,</span> <span class="dt">&quot;ratePerUser&quot;</span><span class="fu">:</span> <span class="st">&quot;10/5s&quot;</span> <span class="fu">},</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;payments&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;minTopup&quot;</span><span class="fu">:</span> <span class="dv">50</span><span class="fu">,</span> <span class="dt">&quot;maxTopup&quot;</span><span class="fu">:</span> <span class="dv">5000</span> <span class="fu">},</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;fare&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;currency&quot;</span><span class="fu">:</span> <span class="st">&quot;INR&quot;</span><span class="fu">,</span> <span class="dt">&quot;surgeMultiplier&quot;</span><span class="fu">:</span> <span class="fl">1.0</span> <span class="fu">}</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<ul>
+<li>The API caches each row in memory and rechecks the ETag every 60
+seconds and in the warm-up timer, so Admin changes go live within a
+minute.</li>
+<li>Admin edits bump <code>version</code>, validate against a schema,
+and write an audit row containing the previous JSON (one-click
+rollback).</li>
+<li>The app caches the last good mobile config and uses it if
+<code>/config</code> fails.</li>
+<li><strong>No secrets in this table.</strong> Keys for Google, Ola,
+OSRM, SMS, FCM, JWT signing and PhonePe live in Key Vault.</li>
+</ul>
+<h2 id="5-login-jwt-and-blocking">5. Login, JWT and blocking</h2>
+<p>Login is SMS OTP; the API then issues a signed JWT valid for one
+year, and every call checks the user's <code>status</code> and
+<code>tokenVersion</code>.</p>
+<ol type="1">
+<li><code>POST /auth/otp/send</code> then
+<code>POST /auth/otp/verify</code>. OTP is hashed, valid 5 minutes, max
+5 attempts, rate-limited per phone.</li>
+<li>On success the API creates or loads the user and returns a JWT.
+Claims: <code>sub</code> (userId), <code>ver</code> (tokenVersion),
+<code>iat</code>, <code>exp</code> (1 year). Header carries
+<code>kid</code>.</li>
+<li>The app stores it in the Android Keystore
+(<code>react-native-keychain</code>) and sends
+<code>Authorization: Bearer &lt;token&gt;</code>.</li>
+<li>A Functions middleware validates signature, expiry, then loads the
+user row (cached in memory for 60 seconds) and checks
+<code>status == Active</code> and <code>ver == tokenVersion</code>. Any
+failure returns <code>401 {"code":"AUTH_REQUIRED"}</code>; the app
+clears the token and opens login.</li>
+<li>Open endpoints (no token): <code>/health</code>,
+<code>/config</code>, <code>/auth/*</code>, <code>/wallet/webhook</code>
+(PhonePe signature check instead).</li>
+</ol>
+<p>Blocking and logout:</p>
+<ul>
+<li>Admin "block user" sets <code>status = Blocked</code> and increments
+<code>tokenVersion</code>. Effective within 60 seconds.</li>
+<li>"Log out everywhere" (user or admin) increments
+<code>tokenVersion</code>.</li>
+<li>Key rotation: keep two signing keys in Key Vault, selected by
+<code>kid</code>, so rotating never logs everyone out.</li>
+</ul>
+<p>Verification (managed from Admin):</p>
+<ul>
+<li>Org email OTP; endorsement by two verified users; personal ID photos
+uploaded to Blob via short-lived write-only SAS, reviewed in the Admin
+queue.</li>
+<li>The verified flag is enforced server-side on offer, request and
+join, not only in the UI.</li>
+<li>Store only a masked ID number (last 4 digits). Never store a full
+Aadhaar number.</li>
+</ul>
+<h2 id="6-cosmos-db-the-rides-container">6. Cosmos DB: the
+<code>rides</code> container</h2>
+<p>One container <code>rides</code> holds every ride document; documents
+are told apart by a <code>type</code> field. It lives in a serverless Cosmos account, because matching and nearby-place searches are spatial and come in bursts; serverless bills only for RUs used. The free-tier provisioned account is reserved for live location (section 6A).</p>
+<p>Container settings:</p>
+<ul>
+<li>Partition key path <code>/pk</code>. Value
+<code>{city}|{yyyy-MM-dd}</code> (IST departure date), for example
+<code>KOC|2026-11-16</code>. Trip-scoped docs use
+<code>T|{tripId}</code>.</li>
+<li>Default TTL on (<code>-1</code>), each document sets its own
+<code>ttl</code>.</li>
+<li>Indexing: spatial index on <code>/routeSearch/?</code>,
+<code>/origin/?</code>, <code>/destination/?</code> and
+<code>/via/[]/?</code> (Point and LineString). <strong>Exclude</strong>
+<code>/routeFull/?</code>, <code>/cumTimeSec/*</code>,
+<code>/matches/*</code> from indexing to save RU on writes.</li>
+<li>One serverless account per subscription. It also holds a places container (preset places, hospitals and other points of interest) with a spatial index, for nearby-place searches.</li>
+</ul>
+<h3 id="61-document-types">6.1 Document types</h3>
+<table>
+<thead>
+<tr class="header">
+<th>type</th>
+<th>pk</th>
+<th>id</th>
+<th>Holds</th>
+<th>ttl</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>offer</code></td>
+<td><code>KOC|2026-11-16</code></td>
+<td><code>KOC20261116-&lt;ulid&gt;</code></td>
+<td>driver, vehicle, seats, departure, fare/km, points, simplified
+route, full polyline, cumulative times, rules</td>
+<td>2 days</td>
+</tr>
+<tr class="even">
+<td><code>request</code></td>
+<td><code>KOC|2026-11-16</code></td>
+<td><code>KOC20261116-&lt;ulid&gt;</code></td>
+<td>rider, origin, destination, time window, seats, status, top-N
+<code>matches[]</code></td>
+<td>2 days</td>
+</tr>
+<tr class="odd">
+<td><code>hold</code></td>
+<td>same as the offer</td>
+<td><code>hold-&lt;offerId&gt;-&lt;requestId&gt;</code></td>
+<td>seat hold while a rider decides</td>
+<td>75 s (config)</td>
+</tr>
+<tr class="even">
+<td><code>live</code></td>
+<td><code>T|&lt;tripId&gt;</code></td>
+<td><code>live</code></td>
+<td>not used: live location is in the location account (section 6A)</td>
+<td>1 day</td>
+</tr>
+<tr class="odd">
+<td><code>crumb</code></td>
+<td><code>T|&lt;tripId&gt;</code></td>
+<td>timestamp</td>
+<td>sampled breadcrumb for share-trip and safety</td>
+<td>7 days</td>
+</tr>
+</tbody>
+</table>
+<p>The id carries city and date, so
+<code>PkFromId("KOC20261116-...")</code> returns
+<code>KOC|2026-11-16</code>. The client only ever holds the id, and
+every "open this offer or request" call is a point read (about 1 RU per
+KB). A search window that crosses midnight queries two partitions.
+Recurring offers are materialised nightly by a timer into one offer per
+date sharing a <code>seriesId</code>.</p>
+<h3 id="62-offer-document">6.2 Offer document</h3>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;KOC20261116-01JC8Q2M7X&quot;</span><span class="fu">,</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;pk&quot;</span><span class="fu">:</span> <span class="st">&quot;KOC|2026-11-16&quot;</span><span class="fu">,</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;offer&quot;</span><span class="fu">,</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;status&quot;</span><span class="fu">:</span> <span class="st">&quot;OPEN&quot;</span><span class="fu">,</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;driverId&quot;</span><span class="fu">:</span> <span class="st">&quot;u_8f2a91&quot;</span><span class="fu">,</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;vehicleId&quot;</span><span class="fu">:</span> <span class="st">&quot;v_3c71&quot;</span><span class="fu">,</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;seriesId&quot;</span><span class="fu">:</span> <span class="kw">null</span><span class="fu">,</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;departAt&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-11-16T08:30:00+05:30&quot;</span><span class="fu">,</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;seatsTotal&quot;</span><span class="fu">:</span> <span class="dv">3</span><span class="fu">,</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;seatsTaken&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;farePerKm&quot;</span><span class="fu">:</span> <span class="fl">4.5</span><span class="fu">,</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;fareMultiplier&quot;</span><span class="fu">:</span> <span class="fl">1.0</span><span class="fu">,</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;origin&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;Point&quot;</span><span class="fu">,</span> <span class="dt">&quot;coordinates&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fl">76.3089</span><span class="ot">,</span> <span class="fl">10.1076</span><span class="ot">]</span> <span class="fu">},</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;destination&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;Point&quot;</span><span class="fu">,</span> <span class="dt">&quot;coordinates&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fl">76.2421</span><span class="ot">,</span> <span class="fl">9.9658</span><span class="ot">]</span> <span class="fu">},</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;via&quot;</span><span class="fu">:</span> <span class="ot">[</span> <span class="fu">{</span> <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;Edappally&quot;</span><span class="fu">,</span> <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;Point&quot;</span><span class="fu">,</span> <span class="dt">&quot;coordinates&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fl">76.3086</span><span class="ot">,</span> <span class="fl">10.0261</span><span class="ot">]</span> <span class="fu">}</span> <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;routeSearch&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;LineString&quot;</span><span class="fu">,</span> <span class="dt">&quot;coordinates&quot;</span><span class="fu">:</span> <span class="ot">[[</span><span class="fl">76.3089</span><span class="ot">,</span> <span class="fl">10.1076</span><span class="ot">],</span> <span class="ot">[</span><span class="fl">76.3071</span><span class="ot">,</span> <span class="fl">10.0702</span><span class="ot">],</span> <span class="ot">[</span><span class="fl">76.3086</span><span class="ot">,</span> <span class="fl">10.0261</span><span class="ot">],</span> <span class="ot">[</span><span class="fl">76.2421</span><span class="ot">,</span> <span class="fl">9.9658</span><span class="ot">]]</span> <span class="fu">},</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;routeFull&quot;</span><span class="fu">:</span> <span class="st">&quot;&lt;encoded polyline, precision 5&gt;&quot;</span><span class="fu">,</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;cumTimeSec&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="dv">0</span><span class="ot">,</span> <span class="dv">410</span><span class="ot">,</span> <span class="dv">905</span><span class="ot">,</span> <span class="dv">1680</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;distanceM&quot;</span><span class="fu">:</span> <span class="dv">21400</span><span class="fu">,</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;durationSec&quot;</span><span class="fu">:</span> <span class="dv">1680</span><span class="fu">,</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;bearingDeg&quot;</span><span class="fu">:</span> <span class="dv">205</span><span class="fu">,</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;rules&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;womenOnly&quot;</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span> <span class="dt">&quot;noSmoking&quot;</span><span class="fu">:</span> <span class="kw">true</span> <span class="fu">},</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;createdAt&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-11-15T21:04:11+05:30&quot;</span><span class="fu">,</span></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;ttl&quot;</span><span class="fu">:</span> <span class="dv">172800</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<ul>
+<li><code>routeSearch</code> = Douglas-Peucker simplified line (about 20
+m tolerance, typically 30 to 80 points). Spatially indexed. Used only
+for the Cosmos rough cut.</li>
+<li><code>routeFull</code> = the full route as an encoded polyline. Not
+indexed. Used in C# for precise snapping.</li>
+<li><code>cumTimeSec</code> = cumulative travel seconds at each vertex
+of the decoded <code>routeFull</code> (same length as its vertex list).
+Built once at offer creation (section 8.1). Gives exact boarding and
+drop times with no network call.</li>
+<li>Offers are immutable after creation except <code>status</code> and
+<code>seatsTaken</code>, which are always updated with an ETag
+<code>IfMatch</code> condition.</li>
+</ul>
+<h3 id="63-request-document">6.3 Request document</h3>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;KOC20261116-01JC8R9TQ4&quot;</span><span class="fu">,</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;pk&quot;</span><span class="fu">:</span> <span class="st">&quot;KOC|2026-11-16&quot;</span><span class="fu">,</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;request&quot;</span><span class="fu">,</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;status&quot;</span><span class="fu">:</span> <span class="st">&quot;SEARCHING&quot;</span><span class="fu">,</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;riderId&quot;</span><span class="fu">:</span> <span class="st">&quot;u_51c0d2&quot;</span><span class="fu">,</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;seats&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;origin&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;Point&quot;</span><span class="fu">,</span> <span class="dt">&quot;coordinates&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fl">76.2999</span><span class="ot">,</span> <span class="fl">10.0010</span><span class="ot">]</span> <span class="fu">},</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;destination&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;Point&quot;</span><span class="fu">,</span> <span class="dt">&quot;coordinates&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fl">76.2600</span><span class="ot">,</span> <span class="fl">9.9750</span><span class="ot">]</span> <span class="fu">},</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;originName&quot;</span><span class="fu">:</span> <span class="st">&quot;Kaloor&quot;</span><span class="fu">,</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;destinationName&quot;</span><span class="fu">:</span> <span class="st">&quot;MG Road&quot;</span><span class="fu">,</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;windowFrom&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-11-16T08:30:00+05:30&quot;</span><span class="fu">,</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;windowTo&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-11-16T09:15:00+05:30&quot;</span><span class="fu">,</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;matchedAt&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-11-15T21:10:02+05:30&quot;</span><span class="fu">,</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;matches&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;offerId&quot;</span><span class="fu">:</span> <span class="st">&quot;KOC20261116-01JC8Q2M7X&quot;</span><span class="fu">,</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;score&quot;</span><span class="fu">:</span> <span class="dv">87</span><span class="fu">,</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;boardAlongM&quot;</span><span class="fu">:</span> <span class="dv">9120</span><span class="fu">,</span> <span class="dt">&quot;dropAlongM&quot;</span><span class="fu">:</span> <span class="dv">14980</span><span class="fu">,</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;board&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fl">76.3004</span><span class="ot">,</span> <span class="fl">10.0021</span><span class="ot">]</span><span class="fu">,</span> <span class="dt">&quot;drop&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="fl">76.2611</span><span class="ot">,</span> <span class="fl">9.9761</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;walkToBoardM&quot;</span><span class="fu">:</span> <span class="dv">180</span><span class="fu">,</span> <span class="dt">&quot;walkFromDropM&quot;</span><span class="fu">:</span> <span class="dv">140</span><span class="fu">,</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;rideM&quot;</span><span class="fu">:</span> <span class="dv">5860</span><span class="fu">,</span> <span class="dt">&quot;fare&quot;</span><span class="fu">:</span> <span class="fl">26.4</span><span class="fu">,</span></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;boardAt&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-11-16T08:47:10+05:30&quot;</span><span class="fu">,</span> <span class="dt">&quot;dropAt&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-11-16T09:01:30+05:30&quot;</span><span class="fu">,</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;walkSource&quot;</span><span class="fu">:</span> <span class="st">&quot;osrm&quot;</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;ttl&quot;</span><span class="fu">:</span> <span class="dv">172800</span></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<ul>
+<li><code>matches[]</code> is a snapshot of the top N (default 20),
+about 300 bytes each. No polylines, no driver profile data; the app
+fetches those when it renders.</li>
+<li>The trimmed route for the map is built on demand by
+<code>GET /matches/{requestId}/{offerId}/route</code> using
+<code>ExtractLine(boardAlongM, dropAlongM)</code> on the offer's
+<code>routeFull</code>.</li>
+<li>Seats are re-validated when the rider selects an offer; the snapshot
+is never trusted for seat availability.</li>
+</ul>
+<h3 id="64-hold-and-seat-concurrency">6.4 Hold and seat concurrency</h3>
+<ul>
+<li>Selecting an offer creates a <code>hold</code> doc (ttl from config,
+75 s). Available seats =
+<code>seatsTotal - seatsTaken - activeHolds</code>.</li>
+<li>Driver accepts (or auto-accept) → update the offer's
+<code>seatsTaken</code> with <code>IfMatch</code> on its ETag. On
+<code>412 Precondition Failed</code>, reload and re-check. Delete the
+hold.</li>
+<li>Hold and offer share a partition, so a transactional batch can
+create the hold and patch the offer together where needed.</li>
+</ul>
+<h3 id="65-ru-budget-guide">6.5 RU budget guide</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Operation</th>
+<th>Approx RU</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Point read, 1 KB</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td>Offer write (with simplified line indexed, full polyline
+excluded)</td>
+<td>10 to 20</td>
+</tr>
+<tr class="odd">
+<td>Candidate spatial query returning up to 100 offers</td>
+<td>tens to low hundreds</td>
+</tr>
+<tr class="even">
+<td>Live location patch (location account, indexing off)</td>
+<td>about 5, from the free 1000 RU/s</td>
+</tr>
+</tbody>
+</table>
+<p>Load test the candidate query in Phase 2 with 5,000 offers in one
+partition. If it is too heavy, use the geohash prefilter in section
+8.6.</p>
+<h2 id="6a-live-location">6A. Live location: free-tier provisioned Cosmos account</h2>
+<p>Live driver location goes in its own Cosmos account on the free tier (1000 RU/s, provisioned), written and read directly by the apps with resource tokens, with no API call per update. This is the pattern already proven in the TOK app.</p>
+<p>Container <code>driverLocation</code>:</p>
+<ul>
+<li>Partition key <code>/id</code>, where <code>id</code> = driverId. One small document per driver, about 300 bytes.</li>
+<li><strong>Indexing mode none.</strong> Only point reads by id are used, so no index is needed and every write costs fewer RUs.</li>
+<li>Dedicated throughput 1000 RU/s (the free-tier grant).</li>
+</ul>
+<pre><code>{
+  "id": "u_8f2a91",
+  "tripId": "T_01JC9A4K2B",
+  "lat": 10.0021, "lon": 76.3004,
+  "heading": 205, "speedKmh": 32,
+  "ts": "2026-11-16T08:47:10+05:30",
+  "seq": 412
+}</code></pre>
+<p>Writes (driver app):</p>
+<ul>
+<li><code>GET /location/token</code> (API) returns a resource token scoped to that driver's one document, valid about 1 hour; the app refreshes it before expiry.</li>
+<li>The app sends a <strong>Patch</strong> (<code>set /lat</code>, <code>/lon</code>, <code>/heading</code>, <code>/speedKmh</code>, <code>/ts</code>, <code>/seq</code>) only during an active trip, and only when the driver has moved 50 m or 15 s have passed.</li>
+<li>On <code>429</code> the app skips that tick and sends the next one; no retry storm.</li>
+</ul>
+<p>Reads (rider app):</p>
+<ul>
+<li>When a trip starts, the API issues the rider a <strong>read-only</strong> resource token for the driver's document, valid for the trip.</li>
+<li>The rider's map does a point read (about 1 RU) at the configured interval (<code>polling.liveLocationSec</code>).</li>
+<li>The API reads the same document for SOS, share-trip and Admin.</li>
+</ul>
+<p>Rules:</p>
+<ul>
+<li><strong>No authority flags in this document.</strong> Approval, verification, block status and trip permissions stay in Table Storage and the rides account, written only by the API, because a write token lets the driver change anything in his own document.</li>
+<li>Tokens are issued only to active, verified users with an active trip; blocking a user stops new tokens.</li>
+<li>Breadcrumbs for share-trip and safety are sampled by the API (for example once a minute) into the <code>crumb</code> documents, not written by the phone.</li>
+</ul>
+<p>Capacity and cost:</p>
+<ul>
+<li>About 5 RU per write and 1 RU per read: 1000 RU/s covers roughly 2,000 drivers sending every 10 seconds, and more with the movement rule. 5,000 simultaneous drivers is a later-scale target; when approached, raise throughput (paid above the free grant) or lengthen the interval.</li>
+<li>Egress: small documents and point reads; Azure's first 100 GB of outbound data per month is free across all services.</li>
+</ul>
+<h2 id="7-table-storage">7. Table Storage</h2>
+<p>Tables index only PartitionKey and RowKey, so each table is shaped
+for its query. Extra lookups use a small index table written alongside
+the main row.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Table</th>
+<th>PartitionKey</th>
+<th>RowKey</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Config</td>
+<td><code>mobile</code> / <code>api</code></td>
+<td><code>current</code></td>
+<td>JSON config (section 4)</td>
+</tr>
+<tr class="even">
+<td>Users</td>
+<td><code>userId</code></td>
+<td><code>profile</code></td>
+<td>profile, verification, <code>status</code>,
+<code>tokenVersion</code>, rating summary</td>
+</tr>
+<tr class="odd">
+<td>UserByPhone</td>
+<td><code>phone</code></td>
+<td><code>userId</code></td>
+<td>login lookup</td>
+</tr>
+<tr class="even">
+<td>Otp</td>
+<td>phone or email</td>
+<td><code>purpose</code></td>
+<td>hashed code, expiry, attempts</td>
+</tr>
+<tr class="odd">
+<td>Endorsements</td>
+<td><code>userId</code></td>
+<td>endorserId</td>
+<td>endorsement workflow</td>
+</tr>
+<tr class="even">
+<td>IdSubmissions</td>
+<td><code>userId</code></td>
+<td>submissionId</td>
+<td>ID review; status index row for the Admin queue</td>
+</tr>
+<tr class="odd">
+<td>Vehicles</td>
+<td><code>userId</code></td>
+<td><code>vehicleId</code></td>
+<td>garage</td>
+</tr>
+<tr class="even">
+<td>Bookings</td>
+<td><code>userId</code></td>
+<td><code>reverse-ts|id</code></td>
+<td>My Carpools and Booking tab</td>
+</tr>
+<tr class="odd">
+<td>Joins</td>
+<td><code>offerId</code></td>
+<td><code>requestId</code></td>
+<td>who asked to join which offer</td>
+</tr>
+<tr class="even">
+<td>Trips</td>
+<td><code>tripId</code></td>
+<td><code>state</code></td>
+<td>trip state machine</td>
+</tr>
+<tr class="odd">
+<td>TripRiders</td>
+<td><code>tripId</code></td>
+<td><code>riderId</code></td>
+<td>stop order, check-in, per-rider status</td>
+</tr>
+<tr class="even">
+<td>ChatThreads</td>
+<td><code>userId</code></td>
+<td><code>threadId</code></td>
+<td>inbox</td>
+</tr>
+<tr class="odd">
+<td>ChatMessages</td>
+<td><code>threadId</code></td>
+<td><code>reverse-ts|id</code></td>
+<td>messages</td>
+</tr>
+<tr class="even">
+<td>Wallet</td>
+<td><code>userId</code></td>
+<td><code>balance</code> / <code>L|reverse-ts|ref</code></td>
+<td>balance and ledger, same partition</td>
+</tr>
+<tr class="odd">
+<td>PaymentOrders</td>
+<td><code>userId</code></td>
+<td><code>orderId</code></td>
+<td>PhonePe orders</td>
+</tr>
+<tr class="even">
+<td>PaymentIndex</td>
+<td><code>idx</code></td>
+<td><code>merchantOrderId</code></td>
+<td>webhook finds the user</td>
+</tr>
+<tr class="odd">
+<td>Ratings</td>
+<td><code>userId</code></td>
+<td><code>tripId</code></td>
+<td>ratings</td>
+</tr>
+<tr class="even">
+<td>Devices</td>
+<td><code>userId</code></td>
+<td><code>deviceId</code></td>
+<td>FCM tokens</td>
+</tr>
+<tr class="odd">
+<td>Idempotency</td>
+<td><code>userId</code></td>
+<td>key</td>
+<td>safe retries of POSTs</td>
+</tr>
+<tr class="even">
+<td>AdminUsers</td>
+<td><code>adminId</code></td>
+<td><code>profile</code></td>
+<td>Admin accounts</td>
+</tr>
+<tr class="odd">
+<td>AuditLog</td>
+<td><code>yyyyMM</code></td>
+<td><code>reverse-ts</code></td>
+<td>every admin action with before/after JSON</td>
+</tr>
+</tbody>
+</table>
+<p>Blob Storage: private containers <code>id-docs</code> and
+<code>vehicle-docs</code>; the app uploads directly using a short-lived
+write-only SAS from the API.</p>
+<h2 id="8-matching-engine-full-specification">8. Matching engine (full
+specification)</h2>
+<p>Cosmos does the rough cut by location; C# does the precise snapping,
+timing, fare and score. One HTTP function, no Durable Functions on the
+search path. This section supersedes the QuickRide Matching Engine
+Design 1.0 document.</p>
+<h3 id="81-at-offer-creation-done-once-per-offer">8.1 At offer creation
+(done once per offer)</h3>
+<ol type="1">
+<li>The driver picks a route from Google Routes alternatives (section
+9). The API holds the chosen route for 15 minutes by
+<code>routeId</code>; <code>POST /offers</code> references it, so a
+client cannot upload an invented route.</li>
+<li>Decode the polyline to WGS84 coordinates (lon, lat).</li>
+<li>Build <code>cumTimeSec</code>: preferred source is Google's per-step
+durations from the chosen route, spread over each step's vertices by
+length. Fallback: call OSRM <code>route</code> (car) with the same
+origin, via points and destination, <code>annotations=duration</code>,
+and accumulate segment durations onto the vertices by length ratio.</li>
+<li>Build <code>routeSearch</code> with Douglas-Peucker
+(<code>DouglasPeuckerSimplifier</code>, about 20 m tolerance in the
+metric CRS, converted back to WGS84). Validate with
+<code>IsValid</code>.</li>
+<li>Compute the overall <code>bearingDeg</code> (origin to
+destination).</li>
+<li>Write the offer document (section 6.2).</li>
+</ol>
+<h3 id="82-coordinate-system">8.2 Coordinate system</h3>
+<ul>
+<li>Store everything in WGS84 (EPSG:4326), GeoJSON order
+<code>[lon, lat]</code>.</li>
+<li>For maths, project to <strong>UTM zone 43N (EPSG:32643)</strong> for
+Kochi; it is metric and accurate to well under 0.1%. Do not use Web
+Mercator (it inflates distances by about 1.5% at Kochi).</li>
+<li>Keep a per-city CRS in a small <code>CityProfile</code> (code, name,
+UTM EPSG, timezone). Create the ProjNet transforms once as
+singletons.</li>
+</ul>
+<h3 id="83-search-pipeline-rider-searching-offers">8.3 Search pipeline
+(rider searching offers)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Stage</th>
+<th>Where</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Candidate query</td>
+<td>Cosmos</td>
+<td>Single partition <code>city|date</code>. Parameterised
+(<code>QueryDefinition.WithParameter</code>). Filters:
+<code>type = 'offer'</code>, <code>status = 'OPEN'</code>,
+<code>departAt</code> within window (minus max ride time),
+<code>seatsTotal - seatsTaken &gt;= @seats</code>,
+<code>ST_DISTANCE(c.routeSearch, @origin) &lt;= @r</code> AND
+<code>ST_DISTANCE(c.routeSearch, @dest) &lt;= @r</code>. Project only
+the fields needed. Cap at <code>maxCandidates</code> (100). <strong>Do
+not</strong> use <code>TOP 10</code>: Cosmos cannot rank by match
+quality.</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Loose bearing cut</td>
+<td>C#</td>
+<td>Drop offers whose overall bearing differs from the rider's by more
+than <code>looseBearingDeg</code> (90). Cheap, removes only clearly
+opposite routes.</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Decode and project</td>
+<td>C#</td>
+<td>Decode <code>routeFull</code>, project to UTM. Cache per offer id in
+memory (offers are immutable).</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Snap pickup</td>
+<td>C#</td>
+<td>Closest point on the full route to the rider origin
+(<code>DistanceOp</code> / <code>LengthIndexedLine.Project</code>).
+Gives <code>boardAlongM</code> and straight-line
+<code>boardOffsetM</code>.</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Snap drop <strong>after</strong> pickup</td>
+<td>C#</td>
+<td>Closest point to the rider destination searched only on the part of
+the route after <code>boardAlongM</code>
+(<code>ExtractLine(boardAlongM, length)</code>, then project, then add
+<code>boardAlongM</code>). Prevents wrong snaps on looping routes.</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>Direction check</td>
+<td>C#</td>
+<td>If <code>dropAlongM - boardAlongM</code> is below a minimum (for
+example 300 m), reject. Never swap the indexes.</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>Segment bearing</td>
+<td>C#</td>
+<td>Bearing of the route segment between board and drop vs. the rider's
+origin-to-destination bearing. Reject above
+<code>segmentBearingDeg</code> (45).</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>Coverage</td>
+<td>C#</td>
+<td><code>coverage = rideM / riderDirectM</code> where
+<code>rideM = dropAlongM - boardAlongM</code> and
+<code>riderDirectM</code> is the straight-line origin-destination
+distance. Reject below <code>minCoverage</code> (0.6).</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td>Timing</td>
+<td>C#</td>
+<td>Interpolate <code>boardAt</code> and <code>dropAt</code> from
+<code>cumTimeSec</code> at <code>boardAlongM</code> and
+<code>dropAlongM</code>, plus <code>departAt</code>. Reject if
+<code>boardAt</code> is outside the rider window plus
+<code>maxWaitMin</code>.</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>Fare</td>
+<td>C#</td>
+<td><code>fare = round(rideM / 1000 * farePerKm * fareMultiplier, 1)</code>.
+Ride distance is along the driver's actual route. Do not use OSRM for
+this.</td>
+</tr>
+<tr class="odd">
+<td>11</td>
+<td>Pre-score, keep top 2N</td>
+<td>C#</td>
+<td>Score with straight-line walk distances (8.4).</td>
+</tr>
+<tr class="even">
+<td>12</td>
+<td>Walking distance</td>
+<td>OSRM</td>
+<td>One OSRM <code>table</code> call, <strong>foot</strong> profile:
+sources = rider origin and the drop points, destinations = the board
+points and rider destination (or two calls: origin → boards, drops →
+destination). Replace straight-line walk with real walk metres. On
+timeout or open circuit: straight-line × 1.3 and
+<code>walkSource = "estimate"</code>.</td>
+</tr>
+<tr class="odd">
+<td>13</td>
+<td>Final score, keep top N</td>
+<td>C#</td>
+<td>Re-score with real walking, drop walks above <code>maxWalkM</code>,
+keep <code>keepTopN</code> (20).</td>
+</tr>
+<tr class="even">
+<td>14</td>
+<td>Write request</td>
+<td>Cosmos</td>
+<td>Upsert the request doc with <code>matches[]</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Target latency: under 800 ms for 100 candidates (stages 2 to 11 are
+about 1 ms per candidate once routes are cached).</p>
+<h3 id="84-match-score">8.4 Match score</h3>
+<pre class="text"><code>walk     = 1 - clamp((walkToBoardM + walkFromDropM) / maxWalkM)
+wait     = 1 - clamp(|boardAt - riderPreferredTime| in minutes / maxWaitMin)
+expected = rideM / 1000 * referenceRatePerKm
+fare     = 1 - clamp(|fare - expected| / expected)
+bearing  = (cos(segmentBearingDiff) + 1) / 2
+coverage = clamp(rideM / riderDirectM)
+
+score = w.walk*walk + w.wait*wait + w.fare*fare + w.bearing*bearing + w.coverage*coverage
+match% = round(100 * score)        // clamp() limits to 0..1; weights from api config, sum to 1</code></pre>
+<ul>
+<li><code>riderPreferredTime</code> = <code>windowFrom</code> unless the
+rider sets a preferred time.</li>
+<li><code>referenceRatePerKm</code> is the city's typical rate per km,
+from config; tune it from real data.</li>
+<li>Weights are tunable per city in the Config table; document every
+change in the audit log.</li>
+</ul>
+<h3 id="85-reverse-direction-driver-seeing-ride-takers">8.5 Reverse
+direction (driver seeing ride takers)</h3>
+<p>Same engine, reversed query. For a given offer, query
+<code>type = 'request'</code>, <code>status = 'SEARCHING'</code>, same
+partition and time window, with
+<code>ST_DISTANCE(c.origin, @routeSearch) &lt;= @r</code> and
+<code>ST_DISTANCE(c.destination, @routeSearch) &lt;= @r</code>, the
+offer's simplified line passed as a parameter. Then stages 2 to 13 per
+request, against this one offer. When a new offer is created, run this
+once and send FCM "new matching riders" to the driver; optionally add
+the offer into those requests' <code>matches[]</code>.</p>
+<h3 id="86-plan-b-if-the-spatial-query-costs-too-many-ru">8.6 Plan B if
+the spatial query costs too many RU</h3>
+<p>At offer creation, store <code>cells</code>: the geohash-6 cells
+(about 1.2 km × 0.6 km) the route passes through. Query with
+<code>ARRAY_CONTAINS(c.cells, @originCell)</code> for the rider's origin
+cell and its 8 neighbours, plus the same for the destination, then run
+the C# stages. Only adopt this after load testing shows the ST_DISTANCE
+query is too expensive.</p>
+<h3 id="87-resilience">8.7 Resilience</h3>
+<ul>
+<li>OSRM calls: 1.5 s timeout, Polly circuit breaker, straight-line
+fallback. Matching must never fail because OSRM is down.</li>
+<li>Cache decoded and projected routes in memory per offer id
+(<code>MemoryCache</code>, sliding 30 minutes).</li>
+<li>Validate all incoming geometry (lat/lon ranges, at least 2 points,
+<code>ST_ISVALID</code> on stored lines).</li>
+</ul>
+<h3 id="88-what-was-removed-from-the-old-word-document-and-why">8.8 What
+was removed from the old Word document, and why</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Removed</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>OSRM multiplexed route calls for ride distance</td>
+<td>Produces junk legs between drivers; ride distance along the driver's
+own route is exact and free</td>
+</tr>
+<tr class="even">
+<td>OSRM table from driver start for boarding time</td>
+<td>Ignores the chosen route and via points; <code>cumTimeSec</code>
+interpolation is exact</td>
+</tr>
+<tr class="odd">
+<td>Constant-speed ratio ETA</td>
+<td>Replaced by <code>cumTimeSec</code></td>
+</tr>
+<tr class="even">
+<td>Storing a trimmed polyline per match</td>
+<td>Bloats request docs; built on demand</td>
+</tr>
+<tr class="odd">
+<td><code>Math.Min/Max</code> swap in the route slicer</td>
+<td>Silently accepts reversed travel; now rejected</td>
+</tr>
+<tr class="even">
+<td><code>TOP 10</code> in the candidate query</td>
+<td>Cuts candidates before scoring</td>
+</tr>
+<tr class="odd">
+<td>Durable Functions fan-out</td>
+<td>Adds latency to a user-waiting call</td>
+</tr>
+<tr class="even">
+<td>Separate DriverMatch container, Azure Maps option</td>
+<td>Not needed</td>
+</tr>
+<tr class="odd">
+<td>Web Mercator</td>
+<td>Replaced by UTM 43N</td>
+</tr>
+</tbody>
+</table>
+<h3 id="89-unit-tests-required">8.9 Unit tests required</h3>
+<ul>
+<li>Snapping on a straight route, an L-shaped route and a looping route
+(drop must snap after pickup).</li>
+<li>Reversed rider rejected.</li>
+<li><code>cumTimeSec</code> interpolation at a vertex, between vertices,
+at both ends.</li>
+<li>Fare along route vs. a known distance.</li>
+<li>Score bounds stay within 0 to 100.</li>
+<li>OSRM timeout falls back to estimates.</li>
+</ul>
+<h2 id="9-maps-places-and-routes">9. Maps, places and routes</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Need</th>
+<th>Provider</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Map in the app</td>
+<td>Google Maps SDK (<code>react-native-maps</code>)</td>
+<td>Android key restricted to package + SHA-1; staging and release
+registered separately</td>
+</tr>
+<tr class="even">
+<td>Route choice when offering</td>
+<td>Google Routes API <code>computeRoutes</code></td>
+<td><code>computeAlternativeRoutes: true</code>, tight field mask
+(polyline, distance, duration, legs.steps duration). Traffic-aware only
+here and at trip start</td>
+</tr>
+<tr class="odd">
+<td>Autocomplete</td>
+<td>Ola, Google fallback</td>
+<td>Proxied by the API; debounce and min chars from mobile config;
+per-user rate limit; small prefix cache; fallback if Ola fails or
+exceeds 1.5 s</td>
+</tr>
+<tr class="even">
+<td>Reverse geocode</td>
+<td>Ola, Google fallback</td>
+<td>Once when a pin is confirmed, never while dragging</td>
+</tr>
+<tr class="odd">
+<td>Walking distance, timing fallback</td>
+<td>OSRM (foot, car)</td>
+<td>Section 8</td>
+</tr>
+</tbody>
+</table>
+<p>Route picker flow: <code>POST /routes</code> → up to 3 alternatives
+drawn on the map → tap to select → <code>POST /offers</code> with
+<code>routeId</code>. Add waypoint: centre pin from the map camera,
+reverse-geocoded, appended to via list (max from config).</p>
+<p><strong>Verify with Google before building:</strong> (1) alternatives
+are returned only when there are no intermediate waypoints, so with
+waypoints the screen shows the single best route; (2) Maps Platform
+terms on storing route polylines for the life of an offer. If storage is
+not allowed, compute the stored <code>routeFull</code> with OSRM car for
+the same origin, via points and destination, and use Google for display
+only.</p>
+<h2 id="10-trips-chat-and-notifications">10. Trips, chat and
+notifications</h2>
+<p>The server owns the trip state machine. Each action is a
+<code>POST</code> that checks who may perform it and writes the new
+state with an ETag.</p>
+<p>States:
+<code>SCHEDULED → STARTED → AT_PICKUP → ON_BOARD → AT_DROP → COMPLETED</code>,
+plus <code>CANCELLED</code> from any state before
+<code>COMPLETED</code>. Per-rider sub-state in TripRiders (waiting,
+picked up, dropped, no-show).</p>
+<p>FCM (HTTP v1 via Firebase Admin SDK for .NET), always sent from a
+queue so HTTP responses never wait on FCM:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Event</th>
+<th>Message</th>
+<th>Android channel</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>New chat message</td>
+<td>notification + data (<code>type=chat</code>, threadId)</td>
+<td><code>chat</code></td>
+</tr>
+<tr class="even">
+<td>Request or join accepted</td>
+<td>notification + data (<code>type=accepted</code>)</td>
+<td><code>accepted</code></td>
+</tr>
+<tr class="odd">
+<td>Trip started, arrived, ended, cancelled</td>
+<td>notification + data</td>
+<td><code>trip</code></td>
+</tr>
+<tr class="even">
+<td>New matching riders, verification result</td>
+<td>notification + data</td>
+<td><code>general</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Tones play when the app is closed because sound is a property of the
+Android channel, created at app start in the existing native module.
+Channel sounds cannot change after creation: choose final sounds before
+first release. Android 13+ needs the notification permission
+prompt.</li>
+<li>Remove device tokens FCM reports as invalid.</li>
+<li>Chat: save to ChatMessages, then FCM. On open or reconnect the chat
+screen fetches messages newer than its last id, so a missed push loses
+nothing.</li>
+<li>Live driver location is not sent by FCM. The driver app patches its own location document directly in Cosmos (section 6A), only during an active trip, when moved 50 m or every 15 s (foreground service with location type, Android
+14 rule); no API call. The old <code>live</code> doc is not used; the rider's map point-reads the driver's location document with a read-only resource token, instead of polling <code>GET /trips/{id}/live</code> at the configured interval.</li>
+</ul>
+<h2 id="11-wallet-and-payments-phonepe-pg-v2">11. Wallet and payments
+(PhonePe PG v2)</h2>
+<p>Top-up credits the wallet once, server-verified; ride payment is
+reserved at booking and settled by an idempotent queue job.</p>
+<p>Top-up:</p>
+<ol type="1">
+<li><code>POST /wallet/topup {amount}</code> → check min/max from config
+→ <code>PaymentOrders</code> row <code>CREATED</code> with unique
+merchantOrderId + <code>PaymentIndex</code> row → PhonePe OAuth token
+(cached until expiry) → PhonePe create order → return orderId and
+token.</li>
+<li>The app opens PhonePe checkout with the React Native SDK.</li>
+<li>On return the app calls <code>GET /wallet/topup/{id}</code>; the
+server asks PhonePe for status. The app's own result is never
+trusted.</li>
+<li>Webhook <code>POST /wallet/webhook</code>: verify PhonePe's
+authorization header, find the user via PaymentIndex, confirm via status
+API.</li>
+<li>Credit once: in one Wallet-partition batch, add ledger row
+<code>L|reverse-ts|topup-&lt;orderId&gt;</code> and update
+<code>balance</code> with ETag; then mark the order
+<code>CREDITED</code>. A duplicate ledger RowKey means already credited,
+so stop.</li>
+<li>Timer re-checks orders stuck in
+<code>CREATED</code>/<code>PENDING</code> at 5, 15 and 60 minutes; marks
+failed after 24 hours. Refunds via PhonePe refund API plus a reversing
+ledger row.</li>
+</ol>
+<p>Ride payment:</p>
+<ul>
+<li><strong>At booking:</strong> reserve the fare: ledger row
+<code>reserve-&lt;tripId&gt;-&lt;riderId&gt;</code> and
+<code>reserved</code> amount on the balance row, in one batch. Booking
+is refused if available balance (balance minus reserved) is too
+low.</li>
+<li><strong>At trip end:</strong> enqueue <code>settle {tripId}</code>.
+The handler runs three idempotent steps, each keyed by tripId so retries
+skip work already done: debit rider (release reserve, ledger
+<code>ride-&lt;tripId&gt;</code>), credit driver (ledger
+<code>earn-&lt;tripId&gt;-&lt;riderId&gt;</code>, minus commission from
+config), mark trip settled.</li>
+<li>Cancellation rules release or partially capture the reserve (rules
+to be confirmed).</li>
+<li>Staging uses PhonePe sandbox, production live credentials, each from
+that subscription's Key Vault. Driver payouts are a separate future
+design.</li>
+</ul>
+<h2 id="12-admin-app">12. Admin app</h2>
+<ul>
+<li>Separate Function App <code>gopool-admin</code>, same
+<code>GoPool.Core</code>, same storage.</li>
+<li>Sign-in: recommended Microsoft Entra ID with app roles Support,
+Verifier, SuperAdmin. Alternative: AdminUsers table with email OTP and a
+short-lived token.</li>
+<li>Every action written to AuditLog (who, what, before/after JSON),
+including Config edits.</li>
+<li>First features: verification queue (view ID photos via short-lived
+read SAS, approve, reject with reason, FCM to user); user search;
+block/unblock and log out everywhere; Config editor with schema
+validation, version history and rollback; rides and disputes view;
+wallet adjustment with mandatory reason.</li>
+<li>Client: React web app on Azure Static Web Apps (recommended).</li>
+</ul>
+<h2 id="13-environments-and-deployment">13. Environments and
+deployment</h2>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th>Staging subscription</th>
+<th>Production subscription</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Cosmos</td>
+<td>Free-tier provisioned (location) + serverless (rides, places)</td>
+<td>Free-tier provisioned (location) + serverless (rides, places)</td>
+</tr>
+<tr class="even">
+<td>Function Apps</td>
+<td><code>gopool-api-stg</code>, <code>gopool-admin-stg</code></td>
+<td><code>gopool-api</code>, <code>gopool-admin</code></td>
+</tr>
+<tr class="odd">
+<td>Storage, Key Vault</td>
+<td>Separate</td>
+<td>Separate</td>
+</tr>
+<tr class="even">
+<td>Third parties</td>
+<td>PhonePe sandbox, Firebase staging project, low-quota Google/Ola
+keys</td>
+<td>Live credentials</td>
+</tr>
+<tr class="odd">
+<td>App build</td>
+<td><code>staging</code> flavour,
+<code>com.tok.coride.staging</code></td>
+<td><code>release</code> flavour, <code>com.tok.coride</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Infra as code: one Bicep template, one parameter file per
+subscription.</li>
+<li>CI/CD (GitHub Actions): push to <code>main</code> deploys staging;
+manual approval promotes the same build to production. Azure login via
+OIDC federated credentials, no stored secrets.</li>
+<li>Local development in VS Code: secrets only in
+<code>local.settings.json</code> (git-ignored) or user secrets; never
+committed, never pasted into chats or tickets. Developers test against
+the staging account (no Cosmos emulator).</li>
+<li>Mobile flavours install side by side, each with its own
+<code>google-services.json</code> and Maps key registration. CI produces
+a staging and a release APK signed with a real keystore stored as a
+GitHub secret.</li>
+</ul>
+<h2 id="14-api-surface">14. API surface</h2>
+<p>All endpoints need the JWT unless marked open.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Group</th>
+<th>Endpoints</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Open</td>
+<td><code>GET /health</code>, <code>GET /config</code>,
+<code>POST /auth/otp/send</code>, <code>POST /auth/otp/verify</code>,
+<code>POST /wallet/webhook</code></td>
+</tr>
+<tr class="even">
+<td>Profile</td>
+<td><code>GET/PATCH /me</code>, <code>POST /me/devices</code>,
+<code>POST /auth/logout</code>, <code>POST /auth/logout-all</code></td>
+</tr>
+<tr class="odd">
+<td>Verification</td>
+<td><code>POST /verify/email/send</code>,
+<code>/verify/email/confirm</code>, <code>/verify/endorse/invite</code>,
+<code>/verify/endorse/accept</code>, <code>POST /verify/id</code>,
+<code>GET /verify/status</code></td>
+</tr>
+<tr class="even">
+<td>Vehicles</td>
+<td><code>GET/POST /vehicles</code>,
+<code>PATCH/DELETE /vehicles/{id}</code>,
+<code>POST /vehicles/{id}/activate</code></td>
+</tr>
+<tr class="odd">
+<td>Places and routes</td>
+<td><code>GET /places/autocomplete</code>,
+<code>GET /places/reverse</code>, <code>POST /routes</code></td>
+</tr>
+<tr class="even">
+<td>Offers</td>
+<td><code>POST /offers</code>, <code>GET /offers/{id}</code>,
+<code>DELETE /offers/{id}</code>, <code>GET /offers/{id}/riders</code>
+(reverse matching)</td>
+</tr>
+<tr class="odd">
+<td>Requests</td>
+<td><code>POST /requests</code> (runs matching),
+<code>GET /requests/{id}</code>,
+<code>GET /requests/{id}/matches</code>,
+<code>GET /matches/{requestId}/{offerId}/route</code></td>
+</tr>
+<tr class="even">
+<td>Joins</td>
+<td><code>POST /joins</code> (creates hold),
+<code>POST /joins/{id}/accept</code>, <code>/decline</code>,
+<code>/cancel</code></td>
+</tr>
+<tr class="odd">
+<td>Trips</td>
+<td><code>GET /trips/{id}</code>, <code>POST /trips/{id}/start</code>,
+<code>/arrive</code>, <code>/pickup</code>, <code>/proceed</code>,
+<code>/end</code>, <code>/cancel</code>, <code>/checkin</code>,
+<code>/stops</code>, <code>GET /location/token</code>,
+<code>GET /trips/{id}/live</code>, <code>POST /trips/{id}/share</code>,
+<code>/sos</code>, <code>/rating</code></td>
+</tr>
+<tr class="even">
+<td>Chat</td>
+<td><code>GET /chats</code>,
+<code>GET/POST /chats/{threadId}/messages</code></td>
+</tr>
+<tr class="odd">
+<td>Wallet</td>
+<td><code>GET /wallet</code>, <code>POST /wallet/topup</code>,
+<code>GET /wallet/topup/{id}</code>, <code>GET /bookings</code></td>
+</tr>
+</tbody>
+</table>
+<p>Cross-cutting: JWT middleware, FluentValidation, idempotency keys on
+POSTs that create money or bookings, correlation id in every log line,
+Application Insights with no phone numbers, ID numbers or exact home
+locations in logs, standard error body
+<code>{"code","message"}</code>.</p>
+<h2 id="15-changes-to-the-react-native-prototype">15. Changes to the
+React Native prototype</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Area</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Stack</td>
+<td>React Native CLI, no Expo. Native Kotlin for channels, tones,
+location foreground service</td>
+</tr>
+<tr class="even">
+<td>API layer</td>
+<td>New <code>src/api/</code> client: base URL per flavour, bearer
+token, on <code>401 AUTH_REQUIRED</code> clear token and reset to login.
+Replace mock data in contexts with API calls; keep the New/Verified user
+switch behind a developer flag</td>
+</tr>
+<tr class="odd">
+<td>Config</td>
+<td><code>GET /config</code> on start, cached locally; debounce,
+polling, limits and feature flags read from it</td>
+</tr>
+<tr class="even">
+<td>Storage</td>
+<td>Token in Keystore; theme, keep-awake and last search in
+AsyncStorage</td>
+</tr>
+<tr class="odd">
+<td>Map and route</td>
+<td>Google map with real polylines, route picker, centre-pin waypoints,
+trimmed segment on match detail</td>
+</tr>
+<tr class="even">
+<td>Push</td>
+<td><code>@react-native-firebase/messaging</code>; channels
+<code>chat</code>, <code>accepted</code>, <code>trip</code>,
+<code>general</code></td>
+</tr>
+<tr class="odd">
+<td>Payments</td>
+<td>PhonePe React Native SDK</td>
+</tr>
+<tr class="even">
+<td>Location</td>
+<td>Permission flow and foreground service during active trips</td>
+</tr>
+<tr class="odd">
+<td>Uploads</td>
+<td>Direct to Blob via SAS</td>
+</tr>
+</tbody>
+</table>
+<h2 id="16-delivery-phases">16. Delivery phases</h2>
+<ol type="1">
+<li><strong>Foundations:</strong> Bicep for staging, solution skeleton,
+CI/CD, Config table and <code>/config</code>, OTP login, JWT middleware
+with status and version check, profile, vehicles, app API client and
+flavours.</li>
+<li><strong>Search and offer:</strong> places proxy, Google map and
+<code>/routes</code>, route picker, offer creation with
+<code>routeSearch</code> and <code>cumTimeSec</code>, requests, matching
+engine with tests, results lists, reverse matching. Load test with 5,000
+offers.</li>
+<li><strong>Ride lifecycle:</strong> holds, joins, accept, cancel, trip
+state machine, stops, check-in, FCM channels and tones, chat, live
+location.</li>
+<li><strong>Trust and money:</strong> org email, endorsements, ID
+upload, Admin API and web app (verification, block, config editor,
+audit), PhonePe top-up, reserve and settlement, ratings.</li>
+<li><strong>Production:</strong> production subscription and live
+credentials, alerts and dashboards, release keystore, Play internal
+testing.</li>
+</ol>
+<h2 id="17-risks">17. Risks</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Cold starts beyond the one warm instance</td>
+<td>Warm-up timer doing real work, ReadyToRun; Flex Consumption if
+needed</td>
+</tr>
+<tr class="even">
+<td>Spatial query RU at 5,000+ offers</td>
+<td>Simplified indexed line, exclude polylines from index, load test,
+geohash plan B</td>
+</tr>
+<tr class="odd">
+<td>OSRM outage</td>
+<td>Timeout, circuit breaker, straight-line fallback</td>
+</tr>
+<tr class="even">
+<td>Google terms and billing</td>
+<td>Verify storage terms; field masks; call only at route choice and
+trip start; budget alert</td>
+</tr>
+<tr class="odd">
+<td>One-year token misuse</td>
+<td>Status and tokenVersion check, Keystore storage, admin block, key
+rotation</td>
+</tr>
+<tr class="even">
+<td>Wallet double credit or debit</td>
+<td>Ledger RowKeys as idempotency keys, ETag batches, queue retries</td>
+</tr>
+<tr class="odd">
+<td>Config edit breaks production</td>
+<td>Schema validation, versions, rollback, last good config kept in
+memory</td>
+</tr>
+<tr class="even">
+<td>Personal data (DPDP Act)</td>
+<td>Consent, retention limits, deletion on request, masked IDs, audit,
+no PII in logs</td>
+</tr>
+<tr class="odd">
+<td>Safety</td>
+<td>Server-enforced verification, SOS, share trip, ratings; legal review
+of terms and insurance</td>
+</tr>
+</tbody>
+</table>
+<h2 id="18-open-questions-for-the-product-owner">18. Open questions for
+the product owner</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />Launch cities and city codes (Kochi
+= <code>KOC</code>?) and Azure region (Central India or South
+India)</label></li>
+<li><label><input type="checkbox" />Is the OSRM foot profile built, or
+only car?</label></li>
+<li><label><input type="checkbox" />Google: which APIs are enabled,
+separate keys for app and server, budget cap, storage terms
+answer</label></li>
+<li><label><input type="checkbox" />Ola: APIs and rate
+limits</label></li>
+<li><label><input type="checkbox" />SMS and email OTP provider; India
+DLT registration status</label></li>
+<li><label><input type="checkbox" />PhonePe v2 merchant id and sandbox
+credentials; min/max top-up; commission; cancellation charges; driver
+payouts</label></li>
+<li><label><input type="checkbox" />Firebase projects for staging and
+production package ids</label></li>
+<li><label><input type="checkbox" />Admin: Entra ID or email OTP; first
+admins and roles</label></li>
+<li><label><input type="checkbox" />Accepted ID documents at
+launch</label></li>
+<li><label><input type="checkbox" />Expected users, daily offers and
+peak searches per minute for the first 3 months</label></li>
+<li><label><input type="checkbox" />Starting matching defaults (radius,
+walk, wait, weights) or use section 4 values</label></li>
+<li><label><input type="checkbox" />Final notification
+sounds</label></li>
+<li><label><input type="checkbox" />Keep <code>com.tok.coride</code> as
+production package id</label></li>
+</ul>
+</div></body>
+</html>
