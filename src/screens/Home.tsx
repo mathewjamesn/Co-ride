@@ -7,6 +7,7 @@ import { colors, radius, shadow, makeStyles } from '../theme';
 import { Place, PresetKey, allPlaces, presetPlaces, quickPlaces } from '../data';
 import { useSearch } from '../state';
 import { useAuth } from '../auth';
+import { useTrip } from '../trip';
 
 /** Place list shown when a shortcut (Recent, Favourites, a preset) is expanded. */
 function PlaceMenu({ title, items, empty, icon = 'map-marker', onPick, onClose }: { title: string; items: Place[]; empty: string; icon?: string; onPick: (p: Place) => void; onClose: () => void }) {
@@ -46,6 +47,9 @@ const quickTiles = [
 export function Home({ navigation }: any) {
   const { s, set, addRecent } = useSearch();
   const { auth, verified, nextStep } = useAuth();
+  const { trip } = useTrip();
+  const rideOn = trip.riders.length > 0 && trip.phase !== 'ended';
+  const resume = () => navigation.navigate(trip.phase === 'accepted' ? 'Accepted' : trip.role === 'rider' ? 'RiderTrip' : 'DriverTrip');
   const { top } = useSafeAreaInsets();
   const [open, setOpen] = useState<'recent' | 'fav' | PresetKey | null>(null);
   const [presetsOpen, setPresetsOpen] = useState(false);
@@ -112,6 +116,16 @@ export function Home({ navigation }: any) {
         </View>
 
         <View style={{ paddingHorizontal: 16, gap: 14 }}>
+          {rideOn ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Resume your ride" onPress={resume} style={st.rideBanner}>
+              <Icon name="car-clock" size={26} color={colors.accent} />
+              <View style={{ flex: 1 }}>
+                <T v="label" color={colors.onInk}>{trip.phase === 'accepted' ? 'Ride confirmed' : 'Ride in progress'}</T>
+                <T v="small" color={colors.darkMuted}>Tap to open your ride.</T>
+              </View>
+              <T v="label" color={colors.accent}>Resume</T>
+            </Pressable>
+          ) : null}
           {!verified ? (
             <Pressable accessibilityRole="button" onPress={ensureVerified} style={st.verifyBanner}>
               <Icon name={auth.status === 'pending' ? 'clock-outline' : 'shield-alert-outline'} size={26} color={colors.warnText} />
@@ -197,6 +211,7 @@ const st = makeStyles(() => ({
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 },
   shortcut: { flex: 1, backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 4 },
   shortIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.lime, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  rideBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.ink, borderRadius: radius.lg, padding: 14, minHeight: 64 },
   verifyBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.warnTint, borderColor: colors.warnLine, borderWidth: 1, borderRadius: radius.lg, padding: 14, minHeight: 64 },
   divider: { height: 1, backgroundColor: colors.line, marginVertical: 8 },
 }));

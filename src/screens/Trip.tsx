@@ -168,6 +168,7 @@ export function Accepted({ navigation }: any) {
         top={top}
         icon="check-decagram"
         bg={colors.ink}
+        onBack={() => navigation.navigate('Home')}
         title={rider ? 'Request accepted' : trip.riders.length > 1 ? `${trip.riders.length} riders confirmed` : 'Rider confirmed'}
         sub={rider && d ? `${d.name} will pick you up at ${d.time}` : `${trip.riders[0]?.name ?? 'A rider'} accepted your offer`}
       />
@@ -236,6 +237,7 @@ export function Accepted({ navigation }: any) {
       </ScrollView>
       <View style={{ padding: 16, paddingBottom: bottom + 16, backgroundColor: colors.white, gap: 4 }}>
         <Action title={rider ? 'Track my ride' : 'Go to trip'} icon={rider ? 'map-marker-path' : 'steering'} onPress={() => navigation.replace(rider ? 'RiderTrip' : 'DriverTrip')} />
+        <Button title="Back to home" variant="outline" onPress={() => navigation.navigate('Home')} />
         <Button title="Cancel ride" variant="text" onPress={() => navigation.navigate('CancelRide', { role: trip.role, from: s.from, to: s.to, when: s.when })} />
       </View>
     </View>
@@ -262,7 +264,7 @@ export function RiderTrip({ navigation }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
-      <Header title={title} subtitle={`${d.name} · ${VEHICLE}`} rightIcon="shield-alert-outline" onRight={() => setSafety(true)} />
+      <Header title={title} subtitle={`${d.name} · ${VEHICLE}`} onBack={() => navigation.navigate('Home')} rightIcon="shield-alert-outline" onRight={() => setSafety(true)} />
       <MapMock height={210} />
       <ScrollView style={[st.sheet, { backgroundColor: colors.ground }]} contentContainerStyle={{ padding: 16, paddingBottom: bottom + 16, gap: 14 }}>
         <View style={st.person}>
@@ -376,7 +378,7 @@ export function DriverTrip({ navigation }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
-      <Header title={title} subtitle={`${active ? vehicleName(active) + ' · ' : ''}${n} rider${n > 1 ? 's' : ''}`} rightIcon="shield-alert-outline" onRight={() => setSafety(true)} />
+      <Header title={title} subtitle={`${active ? vehicleName(active) + ' · ' : ''}${n} rider${n > 1 ? 's' : ''}`} onBack={() => navigation.navigate('Home')} rightIcon="shield-alert-outline" onRight={() => setSafety(true)} />
       <MapMock height={190} />
       <ScrollView style={[st.sheet, { backgroundColor: colors.ground }]} contentContainerStyle={{ padding: 16, paddingBottom: 12, gap: 14 }}>
         {trip.phase === 'started' || trip.phase === 'atStop' ? (
@@ -542,7 +544,7 @@ export function RideComplete({ navigation }: any) {
         ))}
       </ScrollView>
       <View style={{ padding: 16, paddingBottom: bottom + 16 }}>
-        <Action title="Done" icon="check" onPress={done} />
+        <Action title="Back to home" icon="home-outline" onPress={done} />
       </View>
     </View>
   );

@@ -75,6 +75,7 @@ export function Status({ navigation, route }: any) {
         )}
         <View style={st.refer}>
           {!cancelled && <Button title="Cancel ride" variant="danger" style={{ alignSelf: 'stretch', marginTop: 12 }} onPress={() => navigation.navigate('CancelRide', { role: find ? 'rider' : 'driver', from: s.from, to: s.to, when: s.when, people: person.name, personId: person.id })} />}
+          {!cancelled && <Button title="Back to home" variant="outline" style={{ alignSelf: 'stretch', marginTop: 12 }} onPress={() => navigation.popToTop()} />}
           {cancelled && <Button title="Back to home" variant="outline" style={{ alignSelf: 'stretch', marginTop: 12 }} onPress={() => navigation.popToTop()} />}
         </View>
       </ScrollView>
